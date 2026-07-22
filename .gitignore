@@ -1,9 +1,13 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# Godot
+.godot/
+*.translation
+export_presets.cfg
+export.cfg
 
 # dependencies
 node_modules/
 
-# Expo
+# Expo / RN leftovers
 .expo/
 dist/
 web-build/
@@ -26,11 +30,9 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 
-# macOS
+# OS / env
 .DS_Store
 *.pem
-
-# local env files
 .env*.local
 
 # typescript

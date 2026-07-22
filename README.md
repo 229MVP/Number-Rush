@@ -1,12 +1,30 @@
 # Number-Rush
 
-Expo (SDK 57) React Native app.
+Godot 4 mobile game — neon UI port from `design_reference/App.tsx`.
 
-## Setup
+## Requirements
+
+- Godot **4.4+**
+- Portrait mobile (reference **390 × 844**)
+
+## Run
 
 ```bash
-npm install
-npx expo start
+godot --path . 
+# or open project.godot in the Godot editor
 ```
 
-Then press `i` for iOS simulator, `a` for Android emulator, or scan the QR code with Expo Go.
+Main scene: `res://ui/screens/Main.tscn` (Splash → Menu → …).
+
+## Controls
+
+- Tap / click lanes to place the current tile
+- Keys `1`–`4` place into lanes during desktop testing
+- `Esc` opens/closes pause
+- `Enter` / `Space` on Splash starts
+- `F8` toggles debug visual-reference HUD state (debug/editor only)
+
+## Design source
+
+`res://design_reference/App.tsx` is the visual source of truth.
+Gameplay scoring uses `100 × combo multiplier` on exact-21 clears (not the React prototype formula).
