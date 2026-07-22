@@ -4,20 +4,40 @@
 export_presets.cfg
 export.cfg
 
-# Keep asset .import files under assets/, ignore others if any
-# Dependencies / Expo leftovers
+# dependencies
 node_modules/
+
+# Expo / RN leftovers
 .expo/
 dist/
 web-build/
 expo-env.d.ts
 
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
 # OS / env
 .DS_Store
 *.pem
 .env*.local
+
+# typescript
 *.tsbuildinfo
 
-# Native generated
+# generated native folders
 /ios
 /android
