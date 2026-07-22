@@ -1,3 +1,8 @@
-# Expo HAS CHANGED
+# Number Rush — Godot 4
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
+This project is a **Godot 4** mobile game.
+
+- Design source of truth: `res://design_reference/App.tsx`
+- Gameplay rules source of truth: `res://autoload/game_state.gd`
+- Main scene: `res://ui/screens/Main.tscn`
+- Read Expo/React docs only for the design reference file, not for implementation.

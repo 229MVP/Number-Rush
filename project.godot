@@ -1,0 +1,62 @@
+; Engine configuration file.
+; Number Rush — Godot 4 mobile UI port from Figma Make / App.tsx
+config_version=5
+
+[application]
+config/name="Number Rush"
+config/description="Place. Stack. Hit the Target."
+run/main_scene="res://ui/screens/Main.tscn"
+config/features=PackedStringArray("4.4", "Mobile")
+config/icon="res://assets/icon.png"
+
+[autoload]
+GameState="*res://autoload/game_state.gd"
+SaveService="*res://autoload/save_service.gd"
+IconService="*res://autoload/icon_service.gd"
+
+[display]
+window/size/viewport_width=390
+window/size/viewport_height=844
+window/size/window_width_override=390
+window/size/window_height_override=844
+window/handheld/orientation=1
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/stretch/scale_mode="fractional"
+
+[input]
+ui_pause={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194305,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+lane_1={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":49,"key_label":0,"unicode":49,"location":0,"echo":false,"script":null)
+]
+}
+lane_2={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":50,"key_label":0,"unicode":50,"location":0,"echo":false,"script":null)
+]
+}
+lane_3={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":51,"key_label":0,"unicode":51,"location":0,"echo":false,"script":null)
+]
+}
+lane_4={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":52,"key_label":0,"unicode":52,"location":0,"echo":false,"script":null)
+]
+}
+debug_reference={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194339,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
+
+[rendering]
+renderer/rendering_method="mobile"
+textures/canvas_textures/default_texture_filter=0
+environment/defaults/default_clear_color=Color(0.0196078, 0.0235294, 0.0901961, 1)
