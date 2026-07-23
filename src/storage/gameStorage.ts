@@ -53,6 +53,7 @@ export async function setTutorialCompleted(completed = true): Promise<void> {
 
 /** Dev helper — call from console if you need to re-show the tutorial. */
 export async function resetTutorialForDev(): Promise<void> {
-  if (!__DEV__) return;
+  const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
+  if (!isDev) return;
   await setTutorialCompleted(false);
 }

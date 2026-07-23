@@ -47,8 +47,8 @@ export class TileGenerator {
 
   constructor(rng: TileRng = defaultTileRng, useDevSequence = USE_DEV_TILE_SEQUENCE) {
     this.rng = rng;
-    this.sequence =
-      __DEV__ && useDevSequence ? [...DEV_TILE_SEQUENCE] : null;
+    const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
+    this.sequence = isDev && useDevSequence ? [...DEV_TILE_SEQUENCE] : null;
   }
 
   next(): NumberTileData {
