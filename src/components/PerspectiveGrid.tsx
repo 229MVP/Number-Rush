@@ -13,8 +13,8 @@ export function PerspectiveGrid({ height = 180, style }: Props) {
   const cx = width * 0.5;
 
   return (
-    <View pointerEvents="none" style={[styles.wrap, { height }, style]}>
-      <Svg style={{ pointerEvents: "none" }} width={width} height={height}>
+    <View style={[styles.wrap, { height, pointerEvents: 'none' }, style]}>
+      <Svg style={{ pointerEvents: 'none' }} width={width} height={height}>
         {Array.from({ length: 10 }).map((_, i) => {
           const t = i / 9;
           const y = t * height;

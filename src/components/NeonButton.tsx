@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import {
   Animated,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -9,6 +10,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, neonGlow, radii, typography, withAlpha } from '../theme';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 type Size = 'small' | 'normal' | 'large';
 
@@ -46,7 +49,7 @@ export function NeonButton({
     Animated.timing(scale, {
       toValue: to,
       duration: 120,
-      useNativeDriver: true,
+      useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
   };
 

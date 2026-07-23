@@ -2,48 +2,50 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Target, Trophy, User } from 'lucide-react-native';
+import type { BottomNavRoute } from '../navigation/navigationTypes';
 import { colors, neonGlow, typography, withAlpha } from '../theme';
 
-export type BottomNavId = 'menu' | 'missions' | 'leaderboard' | 'profile';
-
 type Props = {
-  active: BottomNavId;
-  onNavigate: (id: BottomNavId) => void;
+  activeRoute: BottomNavRoute;
+  onNavigate: (route: BottomNavRoute) => void;
   style?: ViewStyle;
 };
 
 const ITEMS: Array<{
-  id: BottomNavId;
+  route: BottomNavRoute;
   label: string;
   Icon: React.ComponentType<{ size?: number; color?: string }>;
 }> = [
-  { id: 'menu', label: 'HOME', Icon: Home },
-  { id: 'missions', label: 'MISSIONS', Icon: Target },
-  { id: 'leaderboard', label: 'RANKS', Icon: Trophy },
-  { id: 'profile', label: 'PROFILE', Icon: User },
+  { route: 'MainMenu', label: 'HOME', Icon: Home },
+  { route: 'Missions', label: 'MISSIONS', Icon: Target },
+  { route: 'Leaderboard', label: 'RANKS', Icon: Trophy },
+  { route: 'Profile', label: 'PROFILE', Icon: User },
 ];
 
-export function BottomNavigation({ active, onNavigate, style }: Props) {
+export function BottomNavigation({ activeRoute, onNavigate, style }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
     <View
-      pointerEvents="box-none"
-      style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 6) }, style]}
+      style={[
+        styles.bar,
+        { paddingBottom: Math.max(insets.bottom, 6), pointerEvents: 'box-none' },
+        style,
+      ]}
     >
-      {ITEMS.map(({ id, label, Icon }) => {
-        const on = active === id;
+      {ITEMS.map(({ route, label, Icon }) => {
+        const on = activeRoute === route;
         const color = on ? colors.neonPink : colors.muted;
         return (
           <Pressable
-            key={id}
+            key={route}
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
             hitSlop={6}
-            onPress={() => onNavigate(id)}
+            onPress={() => onNavigate(route)}
             style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
           >
-            <View pointerEvents="none" style={styles.itemInner}>
+            <View style={[styles.itemInner, { pointerEvents: 'none' }]}>
               <Icon size={20} color={color} />
               <Text style={[typography.navLabel, { color }]}>{label}</Text>
               {on ? (

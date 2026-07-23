@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { colors, withAlpha } from '../theme';
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 type Props = {
   /** denser motion for splash; quieter for menu */
@@ -77,12 +79,12 @@ function ShootingStar({ config }: { config: StarConfig }) {
           toValue: 1,
           duration: config.duration,
           easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(progress, {
           toValue: 0,
           duration: 0,
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.delay(900 + (config.delay % 700)),
       ]),
@@ -106,9 +108,9 @@ function ShootingStar({ config }: { config: StarConfig }) {
 
   return (
     <Animated.View
-      pointerEvents="none"
       style={[
         styles.star,
+        { pointerEvents: 'none' },
         {
           left: config.left,
           top: config.top,
@@ -133,13 +135,13 @@ function FloatingDot({ config }: { config: DotConfig }) {
           toValue: 1,
           duration: config.duration,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(progress, {
           toValue: 0,
           duration: config.duration,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ]),
     );
@@ -162,9 +164,9 @@ function FloatingDot({ config }: { config: DotConfig }) {
 
   return (
     <Animated.View
-      pointerEvents="none"
       style={[
         styles.dot,
+        { pointerEvents: 'none' },
         {
           left: config.left,
           top: config.top,
@@ -206,13 +208,13 @@ export function AnimatedNeonBackground({ intensity = 'splash' }: Props) {
           toValue: 1,
           duration: 4200,
           easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
         Animated.timing(ambience, {
           toValue: 0,
           duration: 4200,
           easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
+          useNativeDriver: USE_NATIVE_DRIVER,
         }),
       ]),
     );
@@ -226,11 +228,11 @@ export function AnimatedNeonBackground({ intensity = 'splash' }: Props) {
   });
 
   return (
-    <View pointerEvents="none" style={styles.fill}>
+    <View style={[styles.fill, { pointerEvents: 'none' }]}>
       <Animated.View
-        pointerEvents="none"
         style={[
           styles.ambience,
+          { pointerEvents: 'none' },
           {
             opacity: glowOpacity,
             backgroundColor: withAlpha(colors.purple, intensity === 'splash' ? 0.28 : 0.18),

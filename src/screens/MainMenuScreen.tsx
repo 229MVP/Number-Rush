@@ -1,113 +1,86 @@
 import React from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Play, Settings, ShoppingBag, Star, Trophy } from 'lucide-react-native';
 import { AnimatedNeonBackground } from '../components/AnimatedNeonBackground';
-import { BottomNavigation, BottomNavId } from '../components/BottomNavigation';
+import { BottomNavigation } from '../components/BottomNavigation';
 import { CurrencyChip } from '../components/CurrencyChip';
 import { GridBackground } from '../components/GridBackground';
 import { NeonButton } from '../components/NeonButton';
 import { NeonIconButton } from '../components/NeonIconButton';
 import { NumberRushLogo } from '../components/NumberRushLogo';
 import { PerspectiveGrid } from '../components/PerspectiveGrid';
-import type { RootStackParamList } from '../navigation/navigationTypes';
+import type { BottomNavRoute, RootStackParamList } from '../navigation/navigationTypes';
 import { colors, spacing, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MainMenu'>;
 
-function comingSoon(label: string) {
-  Alert.alert(label, 'Coming soon.');
-}
-
-export function MainMenuScreen(_props: Props) {
+export function MainMenuScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
 
-  const onBottomNav = (id: BottomNavId) => {
-    const labels: Record<BottomNavId, string> = {
-      menu: 'Home',
-      missions: 'Missions',
-      leaderboard: 'Ranks',
-      profile: 'Profile',
-    };
-    console.log(`Bottom nav ${labels[id]} pressed`);
-    if (id === 'menu') return;
-    comingSoon(labels[id]);
+  const onBottomNav = (route: BottomNavRoute) => {
+    if (route === 'MainMenu') return;
+    navigation.navigate(route);
   };
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Background decor — never blocks touches */}
-      <View pointerEvents="none" style={styles.decorLayer}>
+      <View style={[styles.decorLayer, { pointerEvents: 'none' }]}>
         <GridBackground opacity={0.05} />
         <View style={styles.menuGlow} />
         <AnimatedNeonBackground intensity="menu" />
         <PerspectiveGrid />
       </View>
 
-      <View pointerEvents="box-none" style={styles.topRow}>
+      <View style={[styles.topRow, { pointerEvents: 'box-none' }]}>
         <CurrencyChip />
         <NeonIconButton
-          onPress={() => {
-            console.log('Settings pressed');
-            comingSoon('Settings');
-          }}
+          onPress={() => navigation.navigate('Settings')}
           color={colors.muted}
         >
           <Settings size={17} color={colors.muted} />
         </NeonIconButton>
       </View>
 
-      <View pointerEvents="box-none" style={styles.content}>
-        <View pointerEvents="none" style={styles.logoWrap}>
+      <View style={[styles.content, { pointerEvents: 'box-none' }]}>
+        <View style={[styles.logoWrap, { pointerEvents: 'none' }]}>
           <NumberRushLogo scale={0.84} />
         </View>
 
-        <View pointerEvents="box-none" style={styles.buttons}>
+        <View style={[styles.buttons, { pointerEvents: 'box-none' }]}>
           <NeonButton
             label="PLAY"
             color={colors.neonPink}
             size="large"
             icon={<Play size={17} color={colors.white} />}
-            onPress={() => {
-              console.log('Play pressed');
-              comingSoon('Play');
-            }}
+            onPress={() => navigation.navigate('Gameplay')}
           />
           <NeonButton
             label="DAILY TOURNAMENT"
             color={colors.orange}
             size="large"
             icon={<Star size={17} color={colors.white} />}
-            onPress={() => {
-              console.log('Tournament pressed');
-              comingSoon('Daily Tournament');
-            }}
+            onPress={() => navigation.navigate('Tournament')}
           />
           <NeonButton
             label="RANKED"
             color={colors.electricBlue}
             size="large"
             icon={<Trophy size={17} color={colors.white} />}
-            onPress={() => {
-              console.log('Ranked pressed');
-              comingSoon('Ranked');
-            }}
+            onPress={() => navigation.navigate('Ranked')}
           />
           <NeonButton
             label="SHOP"
             color={colors.purple}
             size="large"
             icon={<ShoppingBag size={17} color={colors.white} />}
-            onPress={() => {
-              console.log('Shop pressed');
-              comingSoon('Shop');
-            }}
+            onPress={() => navigation.navigate('Shop')}
           />
         </View>
       </View>
 
-      <BottomNavigation active="menu" onNavigate={onBottomNav} />
+      <BottomNavigation activeRoute="MainMenu" onNavigate={onBottomNav} />
     </View>
   );
 }

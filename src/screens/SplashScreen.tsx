@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -17,6 +18,8 @@ import type { RootStackParamList } from '../navigation/navigationTypes';
 import { colors, neonGlow, typography, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
+
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
 const DOTS = [
   { x: 0.12, y: 0.18, c: colors.neonPink, sz: 4 },
@@ -37,8 +40,8 @@ export function SplashScreen({ navigation }: Props) {
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 0.25, duration: 375, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 375, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.25, duration: 375, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.timing(pulse, { toValue: 1, duration: 375, useNativeDriver: USE_NATIVE_DRIVER }),
       ]),
     );
     loop.start();
@@ -46,7 +49,6 @@ export function SplashScreen({ navigation }: Props) {
   }, [pulse]);
 
   const start = () => {
-    console.log('Splash pressed');
     if (navigating.current) return;
     navigating.current = true;
     navigation.replace('MainMenu');
@@ -55,7 +57,7 @@ export function SplashScreen({ navigation }: Props) {
   return (
     <View style={styles.root}>
       {/* Decorative layers — never receive touches */}
-      <View pointerEvents="none" style={styles.decorLayer}>
+      <View style={[styles.decorLayer, { pointerEvents: 'none' }]}>
         <View style={styles.glowBlob} />
         <GridBackground opacity={0.05} />
         <AnimatedNeonBackground intensity="splash" />

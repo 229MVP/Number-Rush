@@ -22,8 +22,8 @@ export function GridBackground({ opacity = 0.05, cellSize = 32, style }: Props) 
   }, [width, height, cellSize]);
 
   return (
-    <View pointerEvents="none" style={[styles.fill, style]}>
-      <Svg style={{ pointerEvents: "none" }} width={width} height={height}>
+    <View style={[styles.fill, { pointerEvents: 'none' }, style]}>
+      <Svg style={{ pointerEvents: 'none' }} width={width} height={height}>
         {lines.vertical.map((x) => (
           <Line key={`v-${x}`} x1={x} y1={0} x2={x} y2={height} stroke={stroke} strokeWidth={1} />
         ))}
