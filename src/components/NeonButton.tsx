@@ -71,7 +71,6 @@ export function NeonButton({
     >
       <Animated.View style={{ transform: [{ scale }], width: '100%' }}>
         <LinearGradient
-          pointerEvents="none"
           colors={[withAlpha(color, 0.8), withAlpha(color, 0.53)]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -83,10 +82,11 @@ export function NeonButton({
               paddingHorizontal: cfg.padH,
               ...neonGlow(color, 14),
               opacity: disabled ? 0.5 : 1,
+              pointerEvents: 'none',
             },
           ]}
         >
-          <View pointerEvents="none" style={styles.row}>
+          <View style={[styles.row, { pointerEvents: 'none' }]}>
             {icon ? <View style={styles.icon}>{icon}</View> : null}
             <Text style={cfg.text}>{label}</Text>
           </View>

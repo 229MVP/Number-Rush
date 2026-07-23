@@ -8,6 +8,7 @@ type Props = {
   children: React.ReactNode;
   style?: ViewStyle;
   size?: number;
+  accessibilityLabel?: string;
 };
 
 export function NeonIconButton({
@@ -16,11 +17,13 @@ export function NeonIconButton({
   children,
   style,
   size = 44,
+  accessibilityLabel,
 }: Props) {
   const dim = Math.max(44, size);
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       hitSlop={8}
       onPress={onPress}
       style={({ pressed }) => [

@@ -35,6 +35,7 @@ export function ComingSoonScreen({ navigation, config }: Props) {
 
       <View style={styles.topBar}>
         <NeonIconButton
+          accessibilityLabel="Back"
           color={accent}
           onPress={() => navigation.navigate('MainMenu')}
         >

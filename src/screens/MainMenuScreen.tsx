@@ -36,6 +36,7 @@ export function MainMenuScreen({ navigation }: Props) {
       <View style={[styles.topRow, { pointerEvents: 'box-none' }]}>
         <CurrencyChip />
         <NeonIconButton
+          accessibilityLabel="Settings"
           onPress={() => navigation.navigate('Settings')}
           color={colors.muted}
         >
