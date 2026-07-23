@@ -10,6 +10,9 @@ type Props = {
   variant?: Variant;
   multiplierSelected?: boolean;
   showEffective?: boolean;
+  /** Attached to the visual card surface for tutorial measurement. */
+  measureRef?: React.Ref<View>;
+  onCardLayout?: () => void;
 };
 
 export function NumberTile({
@@ -17,6 +20,8 @@ export function NumberTile({
   variant = 'current',
   multiplierSelected = false,
   showEffective = false,
+  measureRef,
+  onCardLayout,
 }: Props) {
   const isCurrent = variant === 'current' || variant === 'travel';
   const effective = multiplierSelected ? tile.value * 2 : tile.value;
@@ -29,6 +34,9 @@ export function NumberTile({
         </Text>
       ) : null}
       <View
+        ref={measureRef}
+        collapsable={false}
+        onLayout={onCardLayout}
         style={[
           isCurrent ? styles.current : styles.next,
           isCurrent

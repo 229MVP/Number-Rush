@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  InteractionManager,
   LayoutChangeEvent,
   Platform,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +25,7 @@ import {
   TargetPanel,
   TutorialOverlay,
 } from '../components/gameplay';
+import type { TutorialStep } from '../components/gameplay/TutorialOverlay';
 import { LANE_COUNT, TARGET_VALUE, TILE_MOVE_DURATION } from '../game/gameConstants';
 import type { GameOverPayload } from '../game/gameTypes';
 import { useNumberRushGame } from '../hooks/useNumberRushGame';
@@ -31,6 +34,10 @@ import {
   getTutorialCompleted,
   setTutorialCompleted,
 } from '../storage/gameStorage';
+import {
+  measureTutorialTarget,
+  type TutorialTargetRect,
+} from '../utils/measureTutorialTarget';
 import { colors, fontFamilies, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Gameplay'>;
@@ -44,8 +51,18 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
  */
 export function GameplayScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [tutorialVisible, setTutorialVisible] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState<TutorialStep>(1);
+  const [tutorialTargetRect, setTutorialTargetRect] =
+    useState<TutorialTargetRect | null>(null);
   const [boardWidth, setBoardWidth] = useState(360);
+  const [rootSize, setRootSize] = useState({ width: 0, height: 0 });
+
+  const gameplayRootRef = useRef<View>(null);
+  const currentTileTargetRef = useRef<View>(null);
+  const laneGroupTargetRef = useRef<View>(null);
+  const targetPanelTargetRef = useRef<View>(null);
 
   const onGameOver = useCallback(
     (payload: GameOverPayload) => {
@@ -66,10 +83,83 @@ export function GameplayScreen({ navigation }: Props) {
     };
   }, []);
 
-  const completeTutorial = useCallback(() => {
+  const finishTutorial = useCallback(() => {
     setTutorialVisible(false);
+    setTutorialTargetRect(null);
     void setTutorialCompleted(true);
   }, []);
+
+  const getActiveTargetRef = useCallback(() => {
+    if (tutorialStep === 1) return currentTileTargetRef;
+    if (tutorialStep === 2) return laneGroupTargetRef;
+    return targetPanelTargetRef;
+  }, [tutorialStep]);
+
+  const measureActiveTarget = useCallback(async () => {
+    let attempt = 0;
+    while (attempt < 3) {
+      attempt += 1;
+      const rect = await measureTutorialTarget(
+        gameplayRootRef,
+        getActiveTargetRef(),
+      );
+      if (rect && rect.width > 0 && rect.height > 0) {
+        setTutorialTargetRect(rect);
+        return;
+      }
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 50);
+      });
+    }
+    setTutorialTargetRect(null);
+  }, [getActiveTargetRef]);
+
+  const scheduleMeasure = useCallback(() => {
+    if (!tutorialVisible) return;
+    requestAnimationFrame(() => {
+      void measureActiveTarget();
+    });
+  }, [tutorialVisible, measureActiveTarget]);
+
+  useEffect(() => {
+    if (!tutorialVisible) return;
+    setTutorialTargetRect(null);
+  }, [tutorialStep, tutorialVisible]);
+
+  useEffect(() => {
+    if (!tutorialVisible || rootSize.width <= 0 || rootSize.height <= 0) return;
+
+    let cancelled = false;
+    const handle = InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) {
+          void measureActiveTarget();
+        }
+      });
+    });
+
+    const retry = setTimeout(() => {
+      if (!cancelled) void measureActiveTarget();
+    }, 120);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(retry);
+      if (handle && typeof handle.cancel === 'function') {
+        handle.cancel();
+      }
+    };
+  }, [
+    tutorialVisible,
+    tutorialStep,
+    rootSize.width,
+    rootSize.height,
+    windowWidth,
+    windowHeight,
+    insets.top,
+    insets.bottom,
+    measureActiveTarget,
+  ]);
 
   const inputLocked =
     game.gameStatus === 'resolving' ||
@@ -104,6 +194,11 @@ export function GameplayScreen({ navigation }: Props) {
     setBoardWidth(e.nativeEvent.layout.width);
   };
 
+  const onRootLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setRootSize({ width, height });
+  };
+
   const quitToMenu = () => {
     game.quitGame();
     navigation.navigate('MainMenu');
@@ -115,7 +210,12 @@ export function GameplayScreen({ navigation }: Props) {
     (boardWidth - lanePad * 2 - laneGap * (LANE_COUNT - 1)) / LANE_COUNT;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View
+      ref={gameplayRootRef}
+      collapsable={false}
+      style={[styles.root, { paddingTop: insets.top }]}
+      onLayout={onRootLayout}
+    >
       <View style={[styles.decorLayer, { pointerEvents: 'none' }]}>
         <GridBackground opacity={0.05} />
         <AnimatedNeonBackground intensity="menu" />
@@ -132,9 +232,21 @@ export function GameplayScreen({ navigation }: Props) {
         pauseDisabled={inputLocked && game.gameStatus !== 'paused'}
       />
 
-      <TargetPanel target={TARGET_VALUE} />
+      <TargetPanel
+        target={TARGET_VALUE}
+        measureRef={targetPanelTargetRef}
+        onPanelLayout={scheduleMeasure}
+      />
 
-      <View style={styles.lanes} onLayout={onBoardLayout}>
+      <View
+        ref={laneGroupTargetRef}
+        collapsable={false}
+        style={styles.lanes}
+        onLayout={(e) => {
+          onBoardLayout(e);
+          scheduleMeasure();
+        }}
+      >
         {game.lanes.map((lane, idx) => (
           <LaneCard
             key={lane.id}
@@ -212,6 +324,8 @@ export function GameplayScreen({ navigation }: Props) {
           variant="current"
           multiplierSelected={game.multiplierSelected}
           showEffective
+          measureRef={currentTileTargetRef}
+          onCardLayout={scheduleMeasure}
         />
         <NumberTile tile={game.nextTile} variant="next" />
       </View>
@@ -245,7 +359,17 @@ export function GameplayScreen({ navigation }: Props) {
         onQuit={quitToMenu}
       />
 
-      <TutorialOverlay visible={tutorialVisible} onComplete={completeTutorial} />
+      <TutorialOverlay
+        visible={tutorialVisible}
+        step={tutorialStep}
+        targetRect={tutorialTargetRect}
+        bounds={rootSize}
+        onNext={() =>
+          setTutorialStep((s) => (s < 3 ? ((s + 1) as TutorialStep) : s))
+        }
+        onSkip={finishTutorial}
+        onComplete={finishTutorial}
+      />
     </View>
   );
 }

@@ -5,12 +5,24 @@ import { colors, fontFamilies, neonGlow, radii, withAlpha } from '../../theme';
 
 type Props = {
   target?: number;
+  /** Attached to the TARGET panel card for tutorial measurement. */
+  measureRef?: React.Ref<View>;
+  onPanelLayout?: () => void;
 };
 
-export function TargetPanel({ target = TARGET_VALUE }: Props) {
+export function TargetPanel({
+  target = TARGET_VALUE,
+  measureRef,
+  onPanelLayout,
+}: Props) {
   return (
     <View style={styles.wrap}>
-      <View style={[styles.panel, neonGlow(colors.electricBlue, 10)]}>
+      <View
+        ref={measureRef}
+        collapsable={false}
+        onLayout={onPanelLayout}
+        style={[styles.panel, neonGlow(colors.electricBlue, 10)]}
+      >
         <Text style={styles.label}>TARGET</Text>
         <Text style={[styles.value, neonGlow(colors.electricBlue, 8)]}>{target}</Text>
       </View>

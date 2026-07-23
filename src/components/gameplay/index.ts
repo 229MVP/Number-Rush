@@ -10,3 +10,4 @@ export {
 export { FloatingScorePopup } from './FloatingScorePopup';
 export { PauseModal } from './PauseModal';
 export { TutorialOverlay } from './TutorialOverlay';
+export type { TutorialStep } from './TutorialOverlay';

@@ -1,10 +1,28 @@
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fontFamilies, neonGlow, radii, spacing, withAlpha } from '../../theme';
+import React, { useEffect, useMemo, useRef } from 'react';
+import {
+  Animated,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { TutorialTargetRect } from '../../utils/measureTutorialTarget';
+import { expandRect } from '../../utils/measureTutorialTarget';
+import { colors, fontFamilies, neonGlow, radii, withAlpha } from '../../theme';
 import { NeonButton } from '../NeonButton';
+
+export type TutorialStep = 1 | 2 | 3;
 
 type Props = {
   visible: boolean;
+  step: TutorialStep;
+  targetRect: TutorialTargetRect | null;
+  /** Gameplay root layout size — dim panels fill this, not the browser window. */
+  bounds: { width: number; height: number };
+  onNext: () => void;
+  onSkip: () => void;
   onComplete: () => void;
 };
 
@@ -23,32 +41,199 @@ const STEPS = [
   },
 ] as const;
 
-export function TutorialOverlay({ visible, onComplete }: Props) {
-  const [step, setStep] = useState(0);
+const STEP_PADDING: Record<TutorialStep, number> = {
+  1: 12,
+  2: 10,
+  3: 10,
+};
+
+const STEP_RADIUS: Record<TutorialStep, number> = {
+  1: 20,
+  2: 18,
+  3: 14,
+};
+
+const DIM = withAlpha(colors.background, 0.82);
+
+export function TutorialOverlay({
+  visible,
+  step,
+  targetRect,
+  bounds,
+  onNext,
+  onSkip,
+  onComplete,
+}: Props) {
+  const insets = useSafeAreaInsets();
+  const animX = useRef(new Animated.Value(0)).current;
+  const animY = useRef(new Animated.Value(0)).current;
+  const animW = useRef(new Animated.Value(0)).current;
+  const animH = useRef(new Animated.Value(0)).current;
+  const borderOpacity = useRef(new Animated.Value(0)).current;
+  const hasRect = useRef(false);
+
+  const overlayW = bounds.width > 0 ? bounds.width : 390;
+  const overlayH = bounds.height > 0 ? bounds.height : 844;
+
+  const spotlight = useMemo(() => {
+    if (!targetRect) return null;
+    return expandRect(targetRect, STEP_PADDING[step], {
+      width: overlayW,
+      height: overlayH,
+    });
+  }, [targetRect, step, overlayW, overlayH]);
+
+  useEffect(() => {
+    if (!visible || !spotlight) {
+      borderOpacity.setValue(0);
+      hasRect.current = false;
+      return;
+    }
+
+    const next = spotlight;
+    if (!hasRect.current) {
+      animX.setValue(next.x);
+      animY.setValue(next.y);
+      animW.setValue(next.width);
+      animH.setValue(next.height);
+      hasRect.current = true;
+      Animated.timing(borderOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: false,
+      }).start();
+      return;
+    }
+
+    Animated.parallel([
+      Animated.timing(animX, {
+        toValue: next.x,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(animY, {
+        toValue: next.y,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(animW, {
+        toValue: next.width,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(animH, {
+        toValue: next.height,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(borderOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [visible, spotlight, animX, animY, animW, animH, borderOpacity]);
+
   if (!visible) return null;
 
-  const current = STEPS[step];
-  const isLast = step >= STEPS.length - 1;
+  const stepIndex = step - 1;
+  const current = STEPS[stepIndex];
+  const isLast = step === 3;
+
+  const sx = spotlight?.x ?? 0;
+  const sy = spotlight?.y ?? 0;
+  const sw = spotlight?.width ?? 0;
+  const sh = spotlight?.height ?? 0;
+
+  const topH = Math.max(0, sy);
+  const leftW = Math.max(0, sx);
+  const rightW = Math.max(0, overlayW - (sx + sw));
+  const bottomH = Math.max(0, overlayH - (sy + sh));
 
   return (
-    <View style={[styles.root, { pointerEvents: 'box-none' }]}>
-      <View style={[styles.dim, { pointerEvents: 'none' }]} />
+    <View style={[styles.root, { pointerEvents: 'auto' }]}>
+      {/* Four-panel dim mask — true hole over the measured target */}
+      <View style={[styles.dimLayer, { pointerEvents: 'none' }]}>
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: overlayW,
+            height: topH,
+            backgroundColor: DIM,
+          }}
+        />
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: sy,
+            width: leftW,
+            height: Math.max(0, sh),
+            backgroundColor: DIM,
+          }}
+        />
+        <View
+          style={{
+            position: 'absolute',
+            left: sx + sw,
+            top: sy,
+            width: rightW,
+            height: Math.max(0, sh),
+            backgroundColor: DIM,
+          }}
+        />
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: sy + sh,
+            width: overlayW,
+            height: bottomH,
+            backgroundColor: DIM,
+          }}
+        />
+      </View>
+
+      {spotlight ? (
+        <Animated.View
+          testID="tutorial-spotlight"
+          accessibilityLabel="tutorial-spotlight"
+          style={[
+            styles.spotlight,
+            {
+              left: animX,
+              top: animY,
+              width: animW,
+              height: animH,
+              borderRadius: STEP_RADIUS[step],
+              opacity: borderOpacity,
+              pointerEvents: 'none',
+            },
+            neonGlow(colors.cyan, 14),
+          ]}
+        />
+      ) : null}
+
       <View
         style={[
-          styles.spotlight,
-          step === 0
-            ? styles.spotTile
-            : step === 1
-              ? styles.spotLanes
-              : styles.spotTarget,
-          { pointerEvents: 'none' },
-          neonGlow(colors.cyan, 16),
+          styles.card,
+          {
+            marginBottom: Math.max(insets.bottom, 8) + 24,
+            marginHorizontal: 22,
+            maxWidth: 420,
+            alignSelf: 'center',
+            width: '100%',
+          },
         ]}
-      />
-
-      <View style={styles.card}>
+      >
         <Text style={styles.stepLabel}>
-          STEP {step + 1} OF {STEPS.length}
+          STEP {step} OF {STEPS.length}
         </Text>
         <View style={styles.dots}>
           {STEPS.map((_, i) => (
@@ -58,7 +243,7 @@ export function TutorialOverlay({ visible, onComplete }: Props) {
                 styles.dot,
                 {
                   backgroundColor:
-                    i === step ? colors.cyan : withAlpha(colors.muted, 0.35),
+                    i === stepIndex ? colors.cyan : withAlpha(colors.muted, 0.35),
                 },
               ]}
             />
@@ -71,7 +256,7 @@ export function TutorialOverlay({ visible, onComplete }: Props) {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Skip tutorial"
-            onPress={onComplete}
+            onPress={onSkip}
             hitSlop={8}
           >
             <Text style={styles.skip}>SKIP</Text>
@@ -84,7 +269,7 @@ export function TutorialOverlay({ visible, onComplete }: Props) {
               fullWidth={false}
               onPress={() => {
                 if (isLast) onComplete();
-                else setStep((s) => s + 1);
+                else onNext();
               }}
               style={{ minWidth: 120 }}
             />
@@ -100,41 +285,15 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     zIndex: 90,
     justifyContent: 'flex-end',
-    paddingBottom: 48,
-    paddingHorizontal: spacing.lg,
   },
-  dim: {
+  dimLayer: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: withAlpha(colors.background, 0.72),
   },
   spotlight: {
     position: 'absolute',
     borderWidth: 2,
-    borderColor: withAlpha(colors.cyan, 0.7),
-    alignSelf: 'center',
-  },
-  spotTile: {
-    top: '52%',
-    width: 100,
-    height: 100,
-    borderRadius: 20,
-    marginLeft: -50,
-    left: '50%',
-  },
-  spotLanes: {
-    top: '24%',
-    width: '88%',
-    height: 200,
-    borderRadius: 18,
-    left: '6%',
-  },
-  spotTarget: {
-    top: '14%',
-    width: 200,
-    height: 52,
-    borderRadius: 14,
-    marginLeft: -100,
-    left: '50%',
+    borderColor: withAlpha(colors.cyan, 0.85),
+    backgroundColor: 'transparent',
   },
   card: {
     backgroundColor: colors.card,
