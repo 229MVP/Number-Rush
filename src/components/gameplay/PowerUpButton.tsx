@@ -8,6 +8,8 @@ type MultiProps = {
   selected: boolean;
   onPress: () => void;
   disabled?: boolean;
+  /** Competitive modes: show disabled tournament copy. */
+  lockedReason?: string | null;
 };
 
 export function MultiplierPowerUpButton({
@@ -15,8 +17,10 @@ export function MultiplierPowerUpButton({
   selected,
   onPress,
   disabled = false,
+  lockedReason = null,
 }: MultiProps) {
-  const unavailable = quantity <= 0 || disabled;
+  const locked = lockedReason != null;
+  const unavailable = locked || quantity <= 0 || disabled;
   return (
     <Pressable
       accessibilityRole="button"
@@ -43,7 +47,9 @@ export function MultiplierPowerUpButton({
       </Text>
       <View>
         <Text style={[styles.title, { color: colors.orange }]}>MULTI</Text>
-        <Text style={styles.sub}>×{quantity} left</Text>
+        <Text style={styles.sub}>
+          {locked ? lockedReason : `×${quantity} left`}
+        </Text>
       </View>
       <Zap size={13} color={selected ? colors.yellow : colors.orange} />
     </Pressable>
@@ -55,6 +61,7 @@ type SwapProps = {
   active: boolean;
   onPress: () => void;
   disabled?: boolean;
+  lockedReason?: string | null;
 };
 
 export function SwapPowerUpButton({
@@ -62,8 +69,10 @@ export function SwapPowerUpButton({
   active,
   onPress,
   disabled = false,
+  lockedReason = null,
 }: SwapProps) {
-  const unavailable = quantity <= 0 || disabled;
+  const locked = lockedReason != null;
+  const unavailable = locked || quantity <= 0 || disabled;
   return (
     <Pressable
       accessibilityRole="button"
@@ -85,7 +94,9 @@ export function SwapPowerUpButton({
       <Shuffle size={15} color={colors.electricBlue} />
       <View>
         <Text style={[styles.title, { color: colors.electricBlue }]}>SWAP</Text>
-        <Text style={styles.sub}>×{quantity} left</Text>
+        <Text style={styles.sub}>
+          {locked ? lockedReason : `×${quantity} left`}
+        </Text>
       </View>
     </Pressable>
   );

@@ -13,6 +13,10 @@ type Props = {
   comboPulseKey: number;
   onPause: () => void;
   pauseDisabled?: boolean;
+  modeBadge?: string | null;
+  modeBadgeColor?: string;
+  tilesLeft?: number | null;
+  attemptLabel?: string | null;
 };
 
 export function GameplayHUD({
@@ -23,6 +27,10 @@ export function GameplayHUD({
   comboPulseKey,
   onPause,
   pauseDisabled = false,
+  modeBadge = null,
+  modeBadgeColor = colors.orange,
+  tilesLeft = null,
+  attemptLabel = null,
 }: Props) {
   const scoreScale = useRef(new Animated.Value(1)).current;
   const comboScale = useRef(new Animated.Value(1)).current;
@@ -64,7 +72,33 @@ export function GameplayHUD({
   const comboColor = comboMultiplier >= 4 ? colors.yellow : colors.orange;
 
   return (
-    <View style={styles.hud}>
+    <View>
+      {(modeBadge || tilesLeft != null || attemptLabel) && (
+        <View style={styles.modeRow}>
+          {modeBadge ? (
+            <View
+              style={[
+                styles.modeBadge,
+                {
+                  backgroundColor: withAlpha(modeBadgeColor, 0.18),
+                  borderColor: withAlpha(modeBadgeColor, 0.55),
+                },
+              ]}
+            >
+              <Text style={[styles.modeBadgeText, { color: modeBadgeColor }]}>
+                {modeBadge}
+              </Text>
+            </View>
+          ) : null}
+          {attemptLabel ? (
+            <Text style={styles.attemptLabel}>{attemptLabel}</Text>
+          ) : null}
+          {tilesLeft != null ? (
+            <Text style={styles.tilesLeft}>TILES LEFT: {tilesLeft}</Text>
+          ) : null}
+        </View>
+      )}
+      <View style={styles.hud}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Pause"
@@ -105,6 +139,7 @@ export function GameplayHUD({
         <Text style={[styles.label, { marginBottom: 2 }]}>STRIKES</Text>
         <StrikeHearts remaining={strikesRemaining} />
       </View>
+    </View>
     </View>
   );
 }
@@ -170,6 +205,44 @@ export function StrikeDisplay({ remaining }: { remaining: number }) {
 }
 
 const styles = StyleSheet.create({
+  modeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: withAlpha(colors.backgroundSecondary, 0.9),
+    borderBottomWidth: 1,
+    borderBottomColor: withAlpha(colors.electricBlue, 0.06),
+    zIndex: 10,
+  },
+  modeBadge: {
+    backgroundColor: withAlpha(colors.orange, 0.18),
+    borderWidth: 1,
+    borderColor: withAlpha(colors.orange, 0.55),
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  modeBadgeText: {
+    fontFamily: fontFamilies.orbitronBold,
+    fontSize: 10,
+    color: colors.orange,
+    letterSpacing: 1.5,
+  },
+  attemptLabel: {
+    fontFamily: fontFamilies.rajdhaniBold,
+    fontSize: 11,
+    color: colors.cyan,
+    letterSpacing: 1,
+  },
+  tilesLeft: {
+    fontFamily: fontFamilies.orbitronBold,
+    fontSize: 11,
+    color: colors.yellow,
+    letterSpacing: 1,
+  },
   hud: {
     flexDirection: 'row',
     alignItems: 'center',

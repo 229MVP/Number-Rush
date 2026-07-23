@@ -1,7 +1,13 @@
+import type { CompetitiveRunResult, GameMode } from '../game/gameTypes';
+
 export type RootStackParamList = {
   Splash: undefined;
   MainMenu: undefined;
-  Gameplay: undefined;
+  Gameplay: {
+    mode?: GameMode;
+    seed?: string;
+    officialAttempt?: boolean;
+  };
   GameOver: {
     finalScore: number;
     bestScore: number;
@@ -11,6 +17,7 @@ export type RootStackParamList = {
     tilesPlaced: number;
     isNewBest: boolean;
   };
+  CompetitiveResults: CompetitiveRunResult;
   Tournament: undefined;
   Ranked: undefined;
   Shop: undefined;

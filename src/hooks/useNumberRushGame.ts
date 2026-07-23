@@ -11,17 +11,30 @@ import {
   resolveLanePlacement,
   swapLaneTotals,
 } from '../game/gameEngine';
+import { getLocalRank } from '../data/mockLeaderboard';
+import { DAILY_MOCK_LEADERBOARD } from '../data/mockLeaderboard';
+import { calculateRankedPoints } from '../game/rankedScoring';
 import type {
+  CompetitiveRunResult,
   FloatingPopup,
   GameOverPayload,
   GameStatus,
   LaneState,
   NumberTileData,
   PlacementOutcome,
+  RunCompletionReason,
+  RunConfiguration,
   RunStats,
   SwapMode,
 } from '../game/gameTypes';
-import { updateBestScoreIfNeeded } from '../storage/gameStorage';
+import {
+  applyRankedForfeit,
+  applyRankedResult,
+  getTodayOfficialRecord,
+  saveDailyPracticeResult,
+  saveOfficialDailyResult,
+  updateBestScoreIfNeeded,
+} from '../storage/gameStorage';
 
 type TravelState = {
   laneIndex: number;
@@ -48,10 +61,11 @@ type State = {
   travel: TravelState;
   scorePulseKey: number;
   comboPulseKey: number;
+  config: RunConfiguration;
 };
 
 type Action =
-  | { type: 'RESTART' }
+  | { type: 'RESTART'; config: RunConfiguration }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'TOGGLE_MULTIPLIER' }
@@ -71,14 +85,14 @@ type Action =
 /** Module-level generator so resolve advances the same bag used at run start. */
 let activeGenerator = createNewRun().tileGenerator;
 
-function restartGenerator(): ReturnType<typeof createNewRun> {
-  const run = createNewRun();
+function restartWithConfig(config: RunConfiguration): ReturnType<typeof createNewRun> {
+  const run = createNewRun(config);
   activeGenerator = run.tileGenerator;
   return run;
 }
 
-function buildFreshState(): State {
-  const run = restartGenerator();
+function buildFreshState(config: RunConfiguration): State {
+  const run = restartWithConfig(config);
   return {
     lanes: run.lanes,
     score: run.score,
@@ -98,13 +112,14 @@ function buildFreshState(): State {
     travel: null,
     scorePulseKey: 0,
     comboPulseKey: 0,
+    config: run.config,
   };
 }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'RESTART': {
-      return buildFreshState();
+      return buildFreshState(action.config);
     }
     case 'PAUSE': {
       if (state.gameStatus !== 'playing' && state.gameStatus !== 'resolving') {
@@ -123,12 +138,14 @@ function reducer(state: State, action: Action): State {
       return { ...state, gameStatus: 'playing' };
     }
     case 'TOGGLE_MULTIPLIER': {
+      if (!state.config.powerUpsEnabled) return state;
       if (state.gameStatus !== 'playing') return state;
       if (state.swapMode !== 'off') return state;
       if (state.multiplierQuantity <= 0) return state;
       return { ...state, multiplierSelected: !state.multiplierSelected };
     }
     case 'TOGGLE_SWAP': {
+      if (!state.config.powerUpsEnabled) return state;
       if (state.gameStatus !== 'playing') return state;
       if (state.swapQuantity <= 0) return state;
       if (state.swapMode !== 'off') {
@@ -149,6 +166,7 @@ function reducer(state: State, action: Action): State {
       };
     }
     case 'SELECT_SWAP_LANE': {
+      if (!state.config.powerUpsEnabled) return state;
       if (state.gameStatus !== 'playing') return state;
       if (state.swapMode === 'off') return state;
       const lane = state.lanes[action.laneIndex];
@@ -167,12 +185,10 @@ function reducer(state: State, action: Action): State {
         };
       }
 
-      // selectSecond
       if (state.selectedSwapLane == null) {
         return { ...state, swapMode: 'off' };
       }
       if (state.selectedSwapLane === action.laneIndex) {
-        // Same lane twice — cancel without consuming.
         return {
           ...state,
           swapMode: 'off',
@@ -285,15 +301,27 @@ function reducer(state: State, action: Action): State {
 let popupSerial = 0;
 
 type Options = {
+  config: RunConfiguration;
   onGameOver: (payload: GameOverPayload) => void;
+  onCompetitiveComplete: (result: CompetitiveRunResult) => void;
 };
 
-export function useNumberRushGame({ onGameOver }: Options) {
-  const [state, dispatch] = useReducer(reducer, undefined, buildFreshState);
+export function useNumberRushGame({
+  config,
+  onGameOver,
+  onCompetitiveComplete,
+}: Options) {
+  const configRef = useRef(config);
+  configRef.current = config;
+
+  const [state, dispatch] = useReducer(reducer, config, buildFreshState);
   const timers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const onGameOverRef = useRef(onGameOver);
   onGameOverRef.current = onGameOver;
+  const onCompetitiveRef = useRef(onCompetitiveComplete);
+  onCompetitiveRef.current = onCompetitiveComplete;
   const placingRef = useRef(false);
+  const finishingRef = useRef(false);
 
   const clearTimers = useCallback(() => {
     timers.current.forEach(clearTimeout);
@@ -301,6 +329,23 @@ export function useNumberRushGame({ onGameOver }: Options) {
   }, []);
 
   useEffect(() => () => clearTimers(), [clearTimers]);
+
+  // Re-seed when route config identity changes (new run params).
+  useEffect(() => {
+    clearTimers();
+    placingRef.current = false;
+    finishingRef.current = false;
+    dispatch({ type: 'RESTART', config });
+  }, [
+    config.mode,
+    config.seed,
+    config.officialAttempt,
+    config.maxTiles,
+    config.powerUpsEnabled,
+    config.maxStrikes,
+    config.targetValue,
+    clearTimers,
+  ]);
 
   const schedule = useCallback((fn: () => void, ms: number) => {
     const id = setTimeout(fn, ms);
@@ -318,26 +363,110 @@ export function useNumberRushGame({ onGameOver }: Options) {
     [schedule],
   );
 
-  const finishGameOver = useCallback(
-    async (stats: RunStats) => {
-      const { bestScore, isNewBest } = await updateBestScoreIfNeeded(stats.score);
-      dispatch({ type: 'SET_GAME_OVER' });
-      onGameOverRef.current({
-        finalScore: stats.score,
-        bestScore,
+  const finishClassic = useCallback(async (stats: RunStats) => {
+    const { bestScore, isNewBest } = await updateBestScoreIfNeeded(stats.score);
+    dispatch({ type: 'SET_GAME_OVER' });
+    onGameOverRef.current({
+      finalScore: stats.score,
+      bestScore,
+      maxComboMultiplier: stats.maxComboMultiplier,
+      longestPerfectStreak: stats.longestPerfectStreak,
+      perfectClears: stats.perfectClears,
+      tilesPlaced: stats.tilesPlaced,
+      isNewBest,
+    });
+  }, []);
+
+  const finishCompetitive = useCallback(
+    async (
+      stats: RunStats,
+      reason: RunCompletionReason,
+      cfg: RunConfiguration,
+    ) => {
+      const base: CompetitiveRunResult = {
+        mode: cfg.mode,
+        score: stats.score,
+        perfectClears: stats.perfectClears,
         maxComboMultiplier: stats.maxComboMultiplier,
         longestPerfectStreak: stats.longestPerfectStreak,
-        perfectClears: stats.perfectClears,
         tilesPlaced: stats.tilesPlaced,
-        isNewBest,
-      });
+        strikesUsed: stats.strikesUsed,
+        completionReason: reason,
+        officialAttempt: cfg.officialAttempt,
+        isPractice: cfg.mode === 'daily' && !cfg.officialAttempt,
+      };
+
+      if (cfg.mode === 'daily') {
+        if (cfg.officialAttempt) {
+          const previousBest = await getTodayOfficialRecord();
+          const record = await saveOfficialDailyResult(base);
+          const bestDailyScore = Math.max(
+            previousBest?.score ?? 0,
+            record.score,
+          );
+          const isNewDailyBest =
+            previousBest == null || record.score > previousBest.score;
+          const dailyRank = getLocalRank(DAILY_MOCK_LEADERBOARD, record.score);
+          dispatch({ type: 'SET_GAME_OVER' });
+          onCompetitiveRef.current({
+            ...base,
+            bestDailyScore,
+            dailyRank,
+            isNewDailyBest,
+          });
+          return;
+        }
+
+        const practiceBest = await saveDailyPracticeResult(stats.score);
+        const official = await getTodayOfficialRecord();
+        dispatch({ type: 'SET_GAME_OVER' });
+        onCompetitiveRef.current({
+          ...base,
+          bestDailyScore: Math.max(practiceBest, official?.score ?? 0),
+          dailyRank: official
+            ? getLocalRank(DAILY_MOCK_LEADERBOARD, official.score)
+            : undefined,
+          isNewDailyBest: false,
+        });
+        return;
+      }
+
+      if (cfg.mode === 'ranked') {
+        const breakdown = calculateRankedPoints(stats, cfg.maxStrikes);
+        const { previous, next } = await applyRankedResult(breakdown);
+        dispatch({ type: 'SET_GAME_OVER' });
+        onCompetitiveRef.current({
+          ...base,
+          rankedPointsEarned: breakdown.total,
+          previousRankedPoints: previous.rankedPoints,
+          newRankedPoints: next.rankedPoints,
+          previousDivision: previous.division,
+          newDivision: next.division,
+          rankedOutcome: breakdown.outcome,
+          rankedBreakdown: breakdown,
+        });
+      }
     },
     [],
   );
 
+  const finishRun = useCallback(
+    async (stats: RunStats, reason: RunCompletionReason) => {
+      if (finishingRef.current) return;
+      finishingRef.current = true;
+      const cfg = configRef.current;
+      if (cfg.mode === 'classic') {
+        await finishClassic(stats);
+        return;
+      }
+      await finishCompetitive(stats, reason, cfg);
+    },
+    [finishClassic, finishCompetitive],
+  );
+
   const placeTile = useCallback(
     (laneIndex: number) => {
-      if (placingRef.current) return;
+      if (placingRef.current || finishingRef.current) return;
       if (state.gameStatus !== 'playing') return;
       if (state.swapMode !== 'off') {
         const modeBefore = state.swapMode;
@@ -353,7 +482,6 @@ export function useNumberRushGame({ onGameOver }: Options) {
       placingRef.current = true;
       dispatch({ type: 'BEGIN_PLACE', laneIndex });
 
-      // Capture values for delayed resolve (avoid stale state).
       const snapshot = {
         lanes: state.lanes,
         currentTile: state.currentTile,
@@ -364,6 +492,7 @@ export function useNumberRushGame({ onGameOver }: Options) {
         runStats: state.runStats,
         multiplierSelected: state.multiplierSelected,
         multiplierQuantity: state.multiplierQuantity,
+        maxTiles: state.config.maxTiles,
       };
 
       schedule(() => {
@@ -398,8 +527,11 @@ export function useNumberRushGame({ onGameOver }: Options) {
           placingRef.current = false;
 
           if (result.gameOver) {
+            const reason: RunCompletionReason = result.tileLimitReached
+              ? 'tileLimit'
+              : 'strikes';
             schedule(() => {
-              void finishGameOver(result.runStats);
+              void finishRun(result.runStats, reason);
             }, 120);
           }
         }, feedbackMs);
@@ -417,9 +549,10 @@ export function useNumberRushGame({ onGameOver }: Options) {
       state.runStats,
       state.multiplierSelected,
       state.multiplierQuantity,
+      state.config.maxTiles,
       schedule,
       addPopup,
-      finishGameOver,
+      finishRun,
     ],
   );
 
@@ -441,15 +574,46 @@ export function useNumberRushGame({ onGameOver }: Options) {
   }, []);
 
   const restartGame = useCallback(() => {
+    if (configRef.current.mode === 'ranked') return;
     clearTimers();
     placingRef.current = false;
-    dispatch({ type: 'RESTART' });
+    finishingRef.current = false;
+    dispatch({ type: 'RESTART', config: configRef.current });
   }, [clearTimers]);
 
   const quitGame = useCallback(() => {
     clearTimers();
     placingRef.current = false;
   }, [clearTimers]);
+
+  const forfeitRanked = useCallback(async () => {
+    if (configRef.current.mode !== 'ranked') return;
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    clearTimers();
+    placingRef.current = false;
+    const { previous, next, breakdown } = await applyRankedForfeit();
+    const stats = state.runStats;
+    dispatch({ type: 'SET_GAME_OVER' });
+    onCompetitiveRef.current({
+      mode: 'ranked',
+      score: stats.score,
+      perfectClears: stats.perfectClears,
+      maxComboMultiplier: stats.maxComboMultiplier,
+      longestPerfectStreak: stats.longestPerfectStreak,
+      tilesPlaced: stats.tilesPlaced,
+      strikesUsed: stats.strikesUsed,
+      completionReason: 'quit',
+      officialAttempt: true,
+      rankedPointsEarned: breakdown.total,
+      previousRankedPoints: previous.rankedPoints,
+      newRankedPoints: next.rankedPoints,
+      previousDivision: previous.division,
+      newDivision: next.division,
+      rankedOutcome: 'loss',
+      rankedBreakdown: breakdown,
+    });
+  }, [clearTimers, state.runStats]);
 
   const toggleMultiplier = useCallback(() => {
     dispatch({ type: 'TOGGLE_MULTIPLIER' });
@@ -459,7 +623,15 @@ export function useNumberRushGame({ onGameOver }: Options) {
     dispatch({ type: 'TOGGLE_SWAP' });
   }, []);
 
+  const tilesLeft =
+    state.config.maxTiles == null
+      ? null
+      : Math.max(0, state.config.maxTiles - state.runStats.tilesPlaced);
+
   const instructionText = (() => {
+    if (!state.config.powerUpsEnabled) {
+      return 'TAP A LANE TO PLACE THE TILE';
+    }
     if (state.swapMode === 'selectFirst') return 'SELECT FIRST LANE';
     if (state.swapMode === 'selectSecond') return 'SELECT SECOND LANE';
     if (state.multiplierSelected) return 'X2 ACTIVE — TAP A LANE';
@@ -485,6 +657,10 @@ export function useNumberRushGame({ onGameOver }: Options) {
     travel: state.travel,
     scorePulseKey: state.scorePulseKey,
     comboPulseKey: state.comboPulseKey,
+    config: state.config,
+    mode: state.config.mode,
+    powerUpsEnabled: state.config.powerUpsEnabled,
+    tilesLeft,
     instructionText,
     placeTile,
     toggleMultiplier,
@@ -494,10 +670,10 @@ export function useNumberRushGame({ onGameOver }: Options) {
     resumeGame,
     restartGame,
     quitGame,
+    forfeitRanked,
   };
 }
 
 export type NumberRushGameApi = ReturnType<typeof useNumberRushGame>;
 
-// Silence unused import if PlacementOutcome needed later for typing
 export type { PlacementOutcome };
