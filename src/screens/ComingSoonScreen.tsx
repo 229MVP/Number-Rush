@@ -26,6 +26,14 @@ export function ComingSoonScreen({ navigation, config }: Props) {
   const insets = useSafeAreaInsets();
   const { title, accent, description, Icon } = config;
 
+  const goBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('MainMenu');
+  };
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={[styles.decorLayer, { pointerEvents: 'none' as const }]}>
@@ -37,7 +45,7 @@ export function ComingSoonScreen({ navigation, config }: Props) {
         <NeonIconButton
           accessibilityLabel="Back"
           color={accent}
-          onPress={() => navigation.navigate('MainMenu')}
+          onPress={goBack}
         >
           <ArrowLeft size={17} color={accent} />
         </NeonIconButton>
