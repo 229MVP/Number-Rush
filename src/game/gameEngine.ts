@@ -1,17 +1,18 @@
 import {
   LANE_COUNT,
-  MAX_STRIKES,
   MULTIPLIER_FACTOR,
   MULTIPLIER_STARTING_QUANTITY,
   SWAP_STARTING_QUANTITY,
   TARGET_VALUE,
 } from './gameConstants';
+import { getClassicConfig } from './gameModes';
 import { scorePerfectClear, comboMultiplierFromStreak } from './scoring';
 import { TileGenerator } from './tileGenerator';
 import type {
   LaneState,
   NumberTileData,
   PlacementResult,
+  RunConfiguration,
   RunStats,
 } from './gameTypes';
 
@@ -47,25 +48,33 @@ export type NewRunState = {
   multiplierSelected: boolean;
   swapQuantity: number;
   tileGenerator: TileGenerator;
+  config: RunConfiguration;
 };
 
-export function createNewRun(generator?: TileGenerator): NewRunState {
-  const tileGenerator = generator ?? new TileGenerator();
+export function createNewRun(
+  config: RunConfiguration = getClassicConfig(),
+): NewRunState {
+  const tileGenerator = config.seed
+    ? TileGenerator.fromSeed(config.seed)
+    : new TileGenerator();
   const currentTile = tileGenerator.next();
   const nextTile = tileGenerator.next();
+  const powerQty = config.powerUpsEnabled ? MULTIPLIER_STARTING_QUANTITY : 0;
+  const swapQty = config.powerUpsEnabled ? SWAP_STARTING_QUANTITY : 0;
   return {
     lanes: createEmptyLanes(),
     score: 0,
     comboStreak: 0,
     comboMultiplier: 1,
-    strikesRemaining: MAX_STRIKES,
+    strikesRemaining: config.maximumStrikes,
     currentTile,
     nextTile,
     runStats: createEmptyRunStats(),
-    multiplierQuantity: MULTIPLIER_STARTING_QUANTITY,
+    multiplierQuantity: powerQty,
     multiplierSelected: false,
-    swapQuantity: SWAP_STARTING_QUANTITY,
+    swapQuantity: swapQty,
     tileGenerator,
+    config,
   };
 }
 
@@ -78,7 +87,7 @@ export function effectiveTileValue(
 
 /**
  * Pure placement resolution. Does not mutate inputs.
- * Advances tile bag externally via returned nextCurrent / nextNext.
+ * When maximumTiles is reached, holds tiles (no new playable tile) and ends the run.
  */
 export function resolveLanePlacement(args: {
   lanes: LaneState[];
@@ -92,6 +101,7 @@ export function resolveLanePlacement(args: {
   multiplierSelected: boolean;
   multiplierQuantity: number;
   tileGenerator: TileGenerator;
+  maximumTiles?: number | null;
 }): PlacementResult & {
   lanes: LaneState[];
   score: number;
@@ -116,6 +126,7 @@ export function resolveLanePlacement(args: {
     multiplierSelected,
     multiplierQuantity,
     tileGenerator,
+    maximumTiles = null,
   } = args;
 
   const previousTotal = lanes[laneIndex].total;
@@ -126,12 +137,18 @@ export function resolveLanePlacement(args: {
     ? Math.max(0, multiplierQuantity - 1)
     : multiplierQuantity;
 
-  const advancedCurrent = nextTile;
-  const advancedNext = tileGenerator.next();
-
   const nextLanes = lanes.map((lane, i) =>
     i === laneIndex ? { ...lane } : { ...lane, status: 'default' as const },
   );
+
+  const markLimit = (tilesPlaced: number, alreadyOver: boolean) => {
+    const hitLimit = maximumTiles != null && tilesPlaced >= maximumTiles;
+    return {
+      tileLimitReached: hitLimit,
+      gameOver: alreadyOver || hitLimit,
+      holdTiles: hitLimit,
+    };
+  };
 
   if (newTotal === TARGET_VALUE) {
     const newStreak = comboStreak + 1;
@@ -150,6 +167,9 @@ export function resolveLanePlacement(args: {
       total: newTotal,
       status: 'perfect',
     };
+    const limit = markLimit(nextStats.tilesPlaced, false);
+    const advancedCurrent = limit.holdTiles ? currentTile : nextTile;
+    const advancedNext = limit.holdTiles ? nextTile : tileGenerator.next();
     return {
       outcome: 'perfect',
       laneIndex,
@@ -161,7 +181,8 @@ export function resolveLanePlacement(args: {
       comboStreak: newStreak,
       comboMultiplier,
       consumedMultiplier,
-      gameOver: false,
+      gameOver: limit.gameOver,
+      tileLimitReached: limit.tileLimitReached,
       lanes: nextLanes,
       score: nextScore,
       runStats: nextStats,
@@ -185,6 +206,9 @@ export function resolveLanePlacement(args: {
       total: newTotal,
       status: 'bust',
     };
+    const limit = markLimit(nextStats.tilesPlaced, nextStrikes <= 0);
+    const advancedCurrent = limit.holdTiles ? currentTile : nextTile;
+    const advancedNext = limit.holdTiles ? nextTile : tileGenerator.next();
     return {
       outcome: 'bust',
       laneIndex,
@@ -196,7 +220,8 @@ export function resolveLanePlacement(args: {
       comboStreak: 0,
       comboMultiplier: 1,
       consumedMultiplier,
-      gameOver: nextStrikes <= 0,
+      gameOver: limit.gameOver,
+      tileLimitReached: limit.tileLimitReached,
       lanes: nextLanes,
       score,
       runStats: nextStats,
@@ -207,7 +232,6 @@ export function resolveLanePlacement(args: {
     };
   }
 
-  // Normal placement — below target, no perfect points.
   const nextStats: RunStats = {
     ...runStats,
     tilesPlaced: runStats.tilesPlaced + 1,
@@ -218,6 +242,9 @@ export function resolveLanePlacement(args: {
     total: newTotal,
     status: 'receiving',
   };
+  const limit = markLimit(nextStats.tilesPlaced, false);
+  const advancedCurrent = limit.holdTiles ? currentTile : nextTile;
+  const advancedNext = limit.holdTiles ? nextTile : tileGenerator.next();
   return {
     outcome: 'normal',
     laneIndex,
@@ -229,7 +256,8 @@ export function resolveLanePlacement(args: {
     comboStreak,
     comboMultiplier: comboMultiplierFromStreak(comboStreak),
     consumedMultiplier,
-    gameOver: false,
+    gameOver: limit.gameOver,
+    tileLimitReached: limit.tileLimitReached,
     lanes: nextLanes,
     score,
     runStats: nextStats,

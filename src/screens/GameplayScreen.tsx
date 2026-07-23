@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   InteractionManager,
@@ -27,7 +27,8 @@ import {
 } from '../components/gameplay';
 import type { TutorialStep } from '../components/gameplay/TutorialOverlay';
 import { LANE_COUNT, TARGET_VALUE, TILE_MOVE_DURATION } from '../game/gameConstants';
-import type { GameOverPayload } from '../game/gameTypes';
+import { resolveRunConfig } from '../game/gameModes';
+import type { DailyResultsParams, GameOverPayload } from '../game/gameTypes';
 import { useNumberRushGame } from '../hooks/useNumberRushGame';
 import type { RootStackParamList } from '../navigation/navigationTypes';
 import {
@@ -49,7 +50,7 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
  * horizontal center (equal-width columns) rather than measureInWindow, which is
  * fragile across Expo Web and native. The game still resolves after TILE_MOVE_DURATION.
  */
-export function GameplayScreen({ navigation }: Props) {
+export function GameplayScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [tutorialVisible, setTutorialVisible] = useState(false);
@@ -64,6 +65,20 @@ export function GameplayScreen({ navigation }: Props) {
   const laneGroupTargetRef = useRef<View>(null);
   const targetPanelTargetRef = useRef<View>(null);
 
+  const runConfig = useMemo(
+    () =>
+      resolveRunConfig({
+        mode: route.params?.mode ?? 'classic',
+        seed: route.params?.seed,
+        officialAttempt: route.params?.officialAttempt,
+      }),
+    [
+      route.params?.mode,
+      route.params?.seed,
+      route.params?.officialAttempt,
+    ],
+  );
+
   const onGameOver = useCallback(
     (payload: GameOverPayload) => {
       navigation.replace('GameOver', payload);
@@ -71,9 +86,21 @@ export function GameplayScreen({ navigation }: Props) {
     [navigation],
   );
 
-  const game = useNumberRushGame({ onGameOver });
+  const onDailyComplete = useCallback(
+    (params: DailyResultsParams) => {
+      navigation.replace('DailyResults', params);
+    },
+    [navigation],
+  );
+
+  const game = useNumberRushGame({
+    configuration: runConfig,
+    onGameOver,
+    onDailyComplete,
+  });
 
   useEffect(() => {
+    if (runConfig.mode !== 'classic') return;
     let mounted = true;
     void getTutorialCompleted().then((done) => {
       if (mounted && !done) setTutorialVisible(true);
@@ -81,7 +108,7 @@ export function GameplayScreen({ navigation }: Props) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [runConfig.mode]);
 
   const finishTutorial = useCallback(() => {
     setTutorialVisible(false);
@@ -204,6 +231,15 @@ export function GameplayScreen({ navigation }: Props) {
     navigation.navigate('MainMenu');
   };
 
+  const powerLocked = game.powerUpsEnabled ? null : 'DISABLED IN TOURNAMENT';
+  const modeBadge = game.mode === 'daily' ? 'DAILY' : null;
+  const attemptLabel =
+    game.mode === 'daily'
+      ? game.officialAttempt
+        ? 'OFFICIAL'
+        : 'PRACTICE'
+      : null;
+
   const lanePad = 10;
   const laneGap = 7;
   const laneWidth =
@@ -230,6 +266,9 @@ export function GameplayScreen({ navigation }: Props) {
         comboPulseKey={game.comboPulseKey}
         onPause={game.pauseGame}
         pauseDisabled={inputLocked && game.gameStatus !== 'paused'}
+        modeBadge={modeBadge}
+        attemptLabel={attemptLabel}
+        tilesRemaining={game.tilesRemaining}
       />
 
       <TargetPanel
@@ -334,7 +373,8 @@ export function GameplayScreen({ navigation }: Props) {
         <MultiplierPowerUpButton
           quantity={game.multiplierQuantity}
           selected={game.multiplierSelected}
-          disabled={inputLocked}
+          disabled={inputLocked || !game.powerUpsEnabled}
+          lockedReason={powerLocked}
           onPress={game.toggleMultiplier}
         />
         <View style={styles.instructions}>
@@ -346,17 +386,23 @@ export function GameplayScreen({ navigation }: Props) {
         <SwapPowerUpButton
           quantity={game.swapQuantity}
           active={game.swapMode !== 'off'}
-          disabled={inputLocked}
+          disabled={inputLocked || !game.powerUpsEnabled}
+          lockedReason={powerLocked}
           onPress={game.toggleSwap}
         />
       </View>
 
       <PauseModal
         visible={game.gameStatus === 'paused'}
+        mode={game.mode}
+        officialAttempt={game.officialAttempt}
         onResume={game.resumeGame}
         onRestart={game.restartGame}
         onSettings={() => navigation.navigate('Settings')}
         onQuit={quitToMenu}
+        onForfeitOfficial={() => {
+          void game.forfeitOfficialDaily();
+        }}
       />
 
       <TutorialOverlay

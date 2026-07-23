@@ -12,6 +12,7 @@ import { SettingsScreen } from '../screens/SettingsScreen';
 import { MissionsScreen } from '../screens/MissionsScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { DailyResultsScreen } from '../screens/DailyResultsScreen';
 import { colors } from '../theme';
 import type { RootStackParamList } from './navigationTypes';
 
@@ -44,6 +45,7 @@ export function AppNavigator() {
         <Stack.Screen name="MainMenu" component={MainMenuScreen} />
         <Stack.Screen name="Gameplay" component={GameplayScreen} />
         <Stack.Screen name="GameOver" component={GameOverScreen} />
+        <Stack.Screen name="DailyResults" component={DailyResultsScreen} />
         <Stack.Screen name="Tournament" component={TournamentScreen} />
         <Stack.Screen name="Ranked" component={RankedScreen} />
         <Stack.Screen name="Shop" component={ShopScreen} />

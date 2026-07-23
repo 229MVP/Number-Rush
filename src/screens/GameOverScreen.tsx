@@ -85,7 +85,9 @@ export function GameOverScreen({ navigation, route }: Props) {
             color={colors.neonPink}
             size="large"
             icon={<RotateCcw size={17} color={colors.white} />}
-            onPress={() => navigation.replace('Gameplay')}
+            onPress={() =>
+              navigation.replace('Gameplay', { mode: 'classic' })
+            }
           />
           <NeonButton
             label="MAIN MENU"
