@@ -67,6 +67,8 @@ export type PlacementResult = {
   comboMultiplier: number;
   consumedMultiplier: boolean;
   gameOver: boolean;
+  /** True when the run ends because the tile limit was hit on this placement. */
+  tileLimitReached?: boolean;
 };
 
 export type GameOverPayload = {
@@ -77,4 +79,73 @@ export type GameOverPayload = {
   perfectClears: number;
   tilesPlaced: number;
   isNewBest: boolean;
+};
+
+export type GameMode = 'classic' | 'daily';
+
+export type RunConfiguration = {
+  mode: GameMode;
+  targetValue: number;
+  maximumStrikes: number;
+  maximumTiles: number | null;
+  seed: string | null;
+  powerUpsEnabled: boolean;
+  officialAttempt: boolean;
+};
+
+export type RunCompletionReason = 'strikes' | 'tileLimit' | 'quit';
+
+export type DailyRunResult = {
+  mode: 'daily';
+  dateKey: string;
+  officialAttempt: boolean;
+  score: number;
+  perfectClears: number;
+  maxComboMultiplier: number;
+  longestPerfectStreak: number;
+  tilesPlaced: number;
+  strikesUsed: number;
+  completionReason: RunCompletionReason;
+  completedAt: string;
+};
+
+export type DailyOfficialRecord = {
+  dateKey: string;
+  score: number;
+  perfectClears: number;
+  maxComboMultiplier: number;
+  longestPerfectStreak: number;
+  tilesPlaced: number;
+  strikesUsed: number;
+  completedAt: string;
+};
+
+export type DailyPracticeRecord = {
+  dateKey: string;
+  bestScore: number;
+  attempts: number;
+  lastPlayedAt: string;
+};
+
+export type DailyAllTimeBest = {
+  score: number;
+  dateKey: string;
+  completedAt: string;
+};
+
+export type DailyResultsParams = {
+  dateKey: string;
+  officialAttempt: boolean;
+  score: number;
+  perfectClears: number;
+  maxComboMultiplier: number;
+  longestPerfectStreak: number;
+  tilesPlaced: number;
+  strikesUsed: number;
+  completionReason: RunCompletionReason;
+  officialScore: number | null;
+  practiceBest: number | null;
+  calculatedRank: number | null;
+  isNewDailyBest: boolean;
+  allTimeBest: number | null;
 };

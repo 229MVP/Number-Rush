@@ -11,6 +11,8 @@ export const MULTIPLIER_STARTING_QUANTITY = 2;
 export const SWAP_STARTING_QUANTITY = 3;
 export const MULTIPLIER_FACTOR = 2;
 
+export const DAILY_MAX_TILES = 40;
+
 export const TILE_MOVE_DURATION = 250;
 export const NORMAL_FEEDBACK_DURATION = 300;
 export const PERFECT_FEEDBACK_DURATION = 900;
@@ -28,4 +30,7 @@ export const DEV_TILE_SEQUENCE = [7, 7, 7, 10, 10, 5, 6, 9, 8, 4] as const;
 export const STORAGE_KEYS = {
   bestScore: 'numberRush.bestScore',
   tutorialCompleted: 'numberRush.tutorialCompleted',
+  dailyOfficialRecords: 'numberRush.daily.officialRecords',
+  dailyPracticeRecords: 'numberRush.daily.practiceRecords',
+  dailyAllTimeBest: 'numberRush.daily.allTimeBest',
 } as const;

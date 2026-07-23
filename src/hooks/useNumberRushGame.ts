@@ -11,16 +11,34 @@ import {
   resolveLanePlacement,
   swapLaneTotals,
 } from '../game/gameEngine';
+import { getDailySeed, getUtcDateKey } from '../game/dailyTournament';
+import { getClassicConfig } from '../game/gameModes';
+import {
+  calculateDailyRank,
+  DAILY_LEADERBOARD,
+} from '../data/dailyLeaderboard';
 import type {
+  DailyResultsParams,
+  DailyRunResult,
   FloatingPopup,
   GameOverPayload,
   GameStatus,
   LaneState,
   NumberTileData,
   PlacementOutcome,
+  RunCompletionReason,
+  RunConfiguration,
   RunStats,
   SwapMode,
 } from '../game/gameTypes';
+import {
+  getDailyAllTimeBest,
+  getDailyPracticeRecord,
+  getOfficialDailyRecord,
+  saveDailyPracticeResult,
+  saveOfficialFromRun,
+  updateDailyAllTimeBest,
+} from '../storage/dailyStorage';
 import { updateBestScoreIfNeeded } from '../storage/gameStorage';
 
 type TravelState = {
@@ -48,10 +66,11 @@ type State = {
   travel: TravelState;
   scorePulseKey: number;
   comboPulseKey: number;
+  config: RunConfiguration;
 };
 
 type Action =
-  | { type: 'RESTART' }
+  | { type: 'RESTART'; config: RunConfiguration }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'TOGGLE_MULTIPLIER' }
@@ -68,17 +87,16 @@ type Action =
   | { type: 'REMOVE_POPUP'; id: string }
   | { type: 'SET_GAME_OVER' };
 
-/** Module-level generator so resolve advances the same bag used at run start. */
-let activeGenerator = createNewRun().tileGenerator;
+let activeGenerator = createNewRun(getClassicConfig()).tileGenerator;
 
-function restartGenerator(): ReturnType<typeof createNewRun> {
-  const run = createNewRun();
+function restartWithConfig(config: RunConfiguration): ReturnType<typeof createNewRun> {
+  const run = createNewRun(config);
   activeGenerator = run.tileGenerator;
   return run;
 }
 
-function buildFreshState(): State {
-  const run = restartGenerator();
+function buildFreshState(config: RunConfiguration): State {
+  const run = restartWithConfig(config);
   return {
     lanes: run.lanes,
     score: run.score,
@@ -98,14 +116,14 @@ function buildFreshState(): State {
     travel: null,
     scorePulseKey: 0,
     comboPulseKey: 0,
+    config: run.config,
   };
 }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'RESTART': {
-      return buildFreshState();
-    }
+    case 'RESTART':
+      return buildFreshState(action.config);
     case 'PAUSE': {
       if (state.gameStatus !== 'playing' && state.gameStatus !== 'resolving') {
         return state;
@@ -123,12 +141,14 @@ function reducer(state: State, action: Action): State {
       return { ...state, gameStatus: 'playing' };
     }
     case 'TOGGLE_MULTIPLIER': {
+      if (!state.config.powerUpsEnabled) return state;
       if (state.gameStatus !== 'playing') return state;
       if (state.swapMode !== 'off') return state;
       if (state.multiplierQuantity <= 0) return state;
       return { ...state, multiplierSelected: !state.multiplierSelected };
     }
     case 'TOGGLE_SWAP': {
+      if (!state.config.powerUpsEnabled) return state;
       if (state.gameStatus !== 'playing') return state;
       if (state.swapQuantity <= 0) return state;
       if (state.swapMode !== 'off') {
@@ -149,6 +169,7 @@ function reducer(state: State, action: Action): State {
       };
     }
     case 'SELECT_SWAP_LANE': {
+      if (!state.config.powerUpsEnabled) return state;
       if (state.gameStatus !== 'playing') return state;
       if (state.swapMode === 'off') return state;
       const lane = state.lanes[action.laneIndex];
@@ -167,12 +188,10 @@ function reducer(state: State, action: Action): State {
         };
       }
 
-      // selectSecond
       if (state.selectedSwapLane == null) {
         return { ...state, swapMode: 'off' };
       }
       if (state.selectedSwapLane === action.laneIndex) {
-        // Same lane twice — cancel without consuming.
         return {
           ...state,
           swapMode: 'off',
@@ -274,9 +293,8 @@ function reducer(state: State, action: Action): State {
         floatingPopups: state.floatingPopups.filter((p) => p.id !== action.id),
       };
     }
-    case 'SET_GAME_OVER': {
+    case 'SET_GAME_OVER':
       return { ...state, gameStatus: 'gameOver' };
-    }
     default:
       return state;
   }
@@ -285,15 +303,27 @@ function reducer(state: State, action: Action): State {
 let popupSerial = 0;
 
 type Options = {
+  configuration: RunConfiguration;
   onGameOver: (payload: GameOverPayload) => void;
+  onDailyComplete: (params: DailyResultsParams) => void;
 };
 
-export function useNumberRushGame({ onGameOver }: Options) {
-  const [state, dispatch] = useReducer(reducer, undefined, buildFreshState);
+export function useNumberRushGame({
+  configuration,
+  onGameOver,
+  onDailyComplete,
+}: Options) {
+  const configRef = useRef(configuration);
+  configRef.current = configuration;
+
+  const [state, dispatch] = useReducer(reducer, configuration, buildFreshState);
   const timers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const onGameOverRef = useRef(onGameOver);
   onGameOverRef.current = onGameOver;
+  const onDailyCompleteRef = useRef(onDailyComplete);
+  onDailyCompleteRef.current = onDailyComplete;
   const placingRef = useRef(false);
+  const finishingRef = useRef(false);
 
   const clearTimers = useCallback(() => {
     timers.current.forEach(clearTimeout);
@@ -301,6 +331,22 @@ export function useNumberRushGame({ onGameOver }: Options) {
   }, []);
 
   useEffect(() => () => clearTimers(), [clearTimers]);
+
+  useEffect(() => {
+    clearTimers();
+    placingRef.current = false;
+    finishingRef.current = false;
+    dispatch({ type: 'RESTART', config: configuration });
+  }, [
+    configuration.mode,
+    configuration.seed,
+    configuration.officialAttempt,
+    configuration.maximumTiles,
+    configuration.powerUpsEnabled,
+    configuration.maximumStrikes,
+    configuration.targetValue,
+    clearTimers,
+  ]);
 
   const schedule = useCallback((fn: () => void, ms: number) => {
     const id = setTimeout(fn, ms);
@@ -318,26 +364,109 @@ export function useNumberRushGame({ onGameOver }: Options) {
     [schedule],
   );
 
-  const finishGameOver = useCallback(
-    async (stats: RunStats) => {
-      const { bestScore, isNewBest } = await updateBestScoreIfNeeded(stats.score);
-      dispatch({ type: 'SET_GAME_OVER' });
-      onGameOverRef.current({
-        finalScore: stats.score,
-        bestScore,
+  const finishClassic = useCallback(async (stats: RunStats) => {
+    const { bestScore, isNewBest } = await updateBestScoreIfNeeded(stats.score);
+    dispatch({ type: 'SET_GAME_OVER' });
+    onGameOverRef.current({
+      finalScore: stats.score,
+      bestScore,
+      maxComboMultiplier: stats.maxComboMultiplier,
+      longestPerfectStreak: stats.longestPerfectStreak,
+      perfectClears: stats.perfectClears,
+      tilesPlaced: stats.tilesPlaced,
+      isNewBest,
+    });
+  }, []);
+
+  const finishDaily = useCallback(
+    async (stats: RunStats, reason: RunCompletionReason, cfg: RunConfiguration) => {
+      const dateKey = getUtcDateKey();
+      const completedAt = new Date().toISOString();
+      const runResult: DailyRunResult = {
+        mode: 'daily',
+        dateKey,
+        officialAttempt: cfg.officialAttempt,
+        score: stats.score,
+        perfectClears: stats.perfectClears,
         maxComboMultiplier: stats.maxComboMultiplier,
         longestPerfectStreak: stats.longestPerfectStreak,
-        perfectClears: stats.perfectClears,
         tilesPlaced: stats.tilesPlaced,
-        isNewBest,
+        strikesUsed: stats.strikesUsed,
+        completionReason: reason,
+        completedAt,
+      };
+
+      if (cfg.officialAttempt) {
+        const { record, isNewDailyBest, allTimeBest } =
+          await saveOfficialFromRun(runResult);
+        const practice = await getDailyPracticeRecord(dateKey);
+        const rank = calculateDailyRank(record.score, DAILY_LEADERBOARD);
+        dispatch({ type: 'SET_GAME_OVER' });
+        onDailyCompleteRef.current({
+          dateKey,
+          officialAttempt: true,
+          score: record.score,
+          perfectClears: record.perfectClears,
+          maxComboMultiplier: record.maxComboMultiplier,
+          longestPerfectStreak: record.longestPerfectStreak,
+          tilesPlaced: record.tilesPlaced,
+          strikesUsed: record.strikesUsed,
+          completionReason: reason,
+          officialScore: record.score,
+          practiceBest: practice?.bestScore ?? null,
+          calculatedRank: rank,
+          isNewDailyBest,
+          allTimeBest: allTimeBest.score,
+        });
+        return;
+      }
+
+      const practice = await saveDailyPracticeResult(runResult);
+      const { best: allTimeBest, isNew } = await updateDailyAllTimeBest(
+        stats.score,
+        dateKey,
+        completedAt,
+      );
+      const official = await getOfficialDailyRecord(dateKey);
+      const rank = calculateDailyRank(stats.score, DAILY_LEADERBOARD);
+      dispatch({ type: 'SET_GAME_OVER' });
+      onDailyCompleteRef.current({
+        dateKey,
+        officialAttempt: false,
+        score: stats.score,
+        perfectClears: stats.perfectClears,
+        maxComboMultiplier: stats.maxComboMultiplier,
+        longestPerfectStreak: stats.longestPerfectStreak,
+        tilesPlaced: stats.tilesPlaced,
+        strikesUsed: stats.strikesUsed,
+        completionReason: reason,
+        officialScore: official?.score ?? null,
+        practiceBest: practice.bestScore,
+        calculatedRank: rank,
+        isNewDailyBest: isNew,
+        allTimeBest: allTimeBest.score,
       });
     },
     [],
   );
 
+  const finishRun = useCallback(
+    async (stats: RunStats, reason: RunCompletionReason) => {
+      if (finishingRef.current) return;
+      finishingRef.current = true;
+      const cfg = configRef.current;
+      if (cfg.mode === 'daily') {
+        await finishDaily(stats, reason, cfg);
+        return;
+      }
+      await finishClassic(stats);
+    },
+    [finishClassic, finishDaily],
+  );
+
   const placeTile = useCallback(
     (laneIndex: number) => {
-      if (placingRef.current) return;
+      if (placingRef.current || finishingRef.current) return;
       if (state.gameStatus !== 'playing') return;
       if (state.swapMode !== 'off') {
         const modeBefore = state.swapMode;
@@ -353,7 +482,6 @@ export function useNumberRushGame({ onGameOver }: Options) {
       placingRef.current = true;
       dispatch({ type: 'BEGIN_PLACE', laneIndex });
 
-      // Capture values for delayed resolve (avoid stale state).
       const snapshot = {
         lanes: state.lanes,
         currentTile: state.currentTile,
@@ -364,6 +492,7 @@ export function useNumberRushGame({ onGameOver }: Options) {
         runStats: state.runStats,
         multiplierSelected: state.multiplierSelected,
         multiplierQuantity: state.multiplierQuantity,
+        maximumTiles: state.config.maximumTiles,
       };
 
       schedule(() => {
@@ -398,8 +527,11 @@ export function useNumberRushGame({ onGameOver }: Options) {
           placingRef.current = false;
 
           if (result.gameOver) {
+            const reason: RunCompletionReason = result.tileLimitReached
+              ? 'tileLimit'
+              : 'strikes';
             schedule(() => {
-              void finishGameOver(result.runStats);
+              void finishRun(result.runStats, reason);
             }, 120);
           }
         }, feedbackMs);
@@ -417,9 +549,10 @@ export function useNumberRushGame({ onGameOver }: Options) {
       state.runStats,
       state.multiplierSelected,
       state.multiplierQuantity,
+      state.config.maximumTiles,
       schedule,
       addPopup,
-      finishGameOver,
+      finishRun,
     ],
   );
 
@@ -441,15 +574,28 @@ export function useNumberRushGame({ onGameOver }: Options) {
   }, []);
 
   const restartGame = useCallback(() => {
+    const cfg = configRef.current;
+    if (cfg.mode === 'daily' && cfg.officialAttempt) return;
     clearTimers();
     placingRef.current = false;
-    dispatch({ type: 'RESTART' });
+    finishingRef.current = false;
+    dispatch({ type: 'RESTART', config: cfg });
   }, [clearTimers]);
 
   const quitGame = useCallback(() => {
     clearTimers();
     placingRef.current = false;
   }, [clearTimers]);
+
+  const forfeitOfficialDaily = useCallback(async () => {
+    const cfg = configRef.current;
+    if (cfg.mode !== 'daily' || !cfg.officialAttempt) return;
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    clearTimers();
+    placingRef.current = false;
+    await finishDaily(state.runStats, 'quit', cfg);
+  }, [clearTimers, finishDaily, state.runStats]);
 
   const toggleMultiplier = useCallback(() => {
     dispatch({ type: 'TOGGLE_MULTIPLIER' });
@@ -459,7 +605,20 @@ export function useNumberRushGame({ onGameOver }: Options) {
     dispatch({ type: 'TOGGLE_SWAP' });
   }, []);
 
+  const tilesRemaining =
+    state.config.maximumTiles == null
+      ? null
+      : Math.max(0, state.config.maximumTiles - state.runStats.tilesPlaced);
+
+  const dateKey =
+    state.config.mode === 'daily'
+      ? getUtcDateKey()
+      : null;
+
   const instructionText = (() => {
+    if (!state.config.powerUpsEnabled) {
+      return 'TAP A LANE TO PLACE THE TILE';
+    }
     if (state.swapMode === 'selectFirst') return 'SELECT FIRST LANE';
     if (state.swapMode === 'selectSecond') return 'SELECT SECOND LANE';
     if (state.multiplierSelected) return 'X2 ACTIVE — TAP A LANE';
@@ -485,6 +644,13 @@ export function useNumberRushGame({ onGameOver }: Options) {
     travel: state.travel,
     scorePulseKey: state.scorePulseKey,
     comboPulseKey: state.comboPulseKey,
+    config: state.config,
+    mode: state.config.mode,
+    powerUpsEnabled: state.config.powerUpsEnabled,
+    officialAttempt: state.config.officialAttempt,
+    tilesRemaining,
+    dateKey,
+    dailySeed: dateKey ? getDailySeed(dateKey) : null,
     instructionText,
     placeTile,
     toggleMultiplier,
@@ -494,10 +660,9 @@ export function useNumberRushGame({ onGameOver }: Options) {
     resumeGame,
     restartGame,
     quitGame,
+    forfeitOfficialDaily,
   };
 }
 
 export type NumberRushGameApi = ReturnType<typeof useNumberRushGame>;
-
-// Silence unused import if PlacementOutcome needed later for typing
 export type { PlacementOutcome };
