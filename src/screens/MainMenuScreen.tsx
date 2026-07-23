@@ -3,6 +3,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Play, Settings, ShoppingBag, Star, Trophy } from 'lucide-react-native';
+import { AnimatedNeonBackground } from '../components/AnimatedNeonBackground';
 import { BottomNavigation, BottomNavId } from '../components/BottomNavigation';
 import { CurrencyChip } from '../components/CurrencyChip';
 import { GridBackground } from '../components/GridBackground';
@@ -23,62 +24,85 @@ export function MainMenuScreen(_props: Props) {
   const insets = useSafeAreaInsets();
 
   const onBottomNav = (id: BottomNavId) => {
-    if (id === 'menu') return;
     const labels: Record<BottomNavId, string> = {
       menu: 'Home',
       missions: 'Missions',
       leaderboard: 'Ranks',
       profile: 'Profile',
     };
+    console.log(`Bottom nav ${labels[id]} pressed`);
+    if (id === 'menu') return;
     comingSoon(labels[id]);
   };
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <View style={styles.topRow}>
+      {/* Background decor — never blocks touches */}
+      <View pointerEvents="none" style={styles.decorLayer}>
+        <GridBackground opacity={0.05} />
+        <View style={styles.menuGlow} />
+        <AnimatedNeonBackground intensity="menu" />
+        <PerspectiveGrid />
+      </View>
+
+      <View pointerEvents="box-none" style={styles.topRow}>
         <CurrencyChip />
-        <NeonIconButton onPress={() => comingSoon('Settings')} color={colors.muted}>
+        <NeonIconButton
+          onPress={() => {
+            console.log('Settings pressed');
+            comingSoon('Settings');
+          }}
+          color={colors.muted}
+        >
           <Settings size={17} color={colors.muted} />
         </NeonIconButton>
       </View>
 
-      <View style={styles.content}>
-        <GridBackground opacity={0.05} />
-        <View style={styles.menuGlow} pointerEvents="none" />
-        <PerspectiveGrid />
-
-        <View style={styles.logoWrap}>
+      <View pointerEvents="box-none" style={styles.content}>
+        <View pointerEvents="none" style={styles.logoWrap}>
           <NumberRushLogo scale={0.84} />
         </View>
 
-        <View style={styles.buttons}>
+        <View pointerEvents="box-none" style={styles.buttons}>
           <NeonButton
             label="PLAY"
             color={colors.neonPink}
             size="large"
             icon={<Play size={17} color={colors.white} />}
-            onPress={() => comingSoon('Play')}
+            onPress={() => {
+              console.log('Play pressed');
+              comingSoon('Play');
+            }}
           />
           <NeonButton
             label="DAILY TOURNAMENT"
             color={colors.orange}
             size="large"
             icon={<Star size={17} color={colors.white} />}
-            onPress={() => comingSoon('Daily Tournament')}
+            onPress={() => {
+              console.log('Tournament pressed');
+              comingSoon('Daily Tournament');
+            }}
           />
           <NeonButton
             label="RANKED"
             color={colors.electricBlue}
             size="large"
             icon={<Trophy size={17} color={colors.white} />}
-            onPress={() => comingSoon('Ranked')}
+            onPress={() => {
+              console.log('Ranked pressed');
+              comingSoon('Ranked');
+            }}
           />
           <NeonButton
             label="SHOP"
             color={colors.purple}
             size="large"
             icon={<ShoppingBag size={17} color={colors.white} />}
-            onPress={() => comingSoon('Shop')}
+            onPress={() => {
+              console.log('Shop pressed');
+              comingSoon('Shop');
+            }}
           />
         </View>
       </View>
@@ -93,18 +117,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  decorLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 0,
+  },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.screenPadding,
     paddingTop: spacing.lg,
+    zIndex: 10,
   },
   content: {
     flex: 1,
     paddingHorizontal: spacing.screenPadding,
     paddingBottom: 10,
-    overflow: 'hidden',
+    zIndex: 10,
   },
   menuGlow: {
     position: 'absolute',
@@ -119,11 +152,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 26,
     alignItems: 'center',
-    zIndex: 1,
   },
   buttons: {
     width: '100%',
     gap: spacing.menuButtonGap,
-    zIndex: 1,
   },
 });

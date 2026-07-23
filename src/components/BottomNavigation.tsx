@@ -27,7 +27,10 @@ export function BottomNavigation({ active, onNavigate, style }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 2) }, style]}>
+    <View
+      pointerEvents="box-none"
+      style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 6) }, style]}
+    >
       {ITEMS.map(({ id, label, Icon }) => {
         const on = active === id;
         const color = on ? colors.neonPink : colors.muted;
@@ -36,12 +39,19 @@ export function BottomNavigation({ active, onNavigate, style }: Props) {
             key={id}
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
+            hitSlop={6}
             onPress={() => onNavigate(id)}
-            style={styles.item}
+            style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
           >
-            <Icon size={20} color={color} />
-            <Text style={[typography.navLabel, { color }]}>{label}</Text>
-            {on ? <View style={[styles.indicator, neonGlow(colors.neonPink, 3)]} /> : <View style={styles.indicatorSpacer} />}
+            <View pointerEvents="none" style={styles.itemInner}>
+              <Icon size={20} color={color} />
+              <Text style={[typography.navLabel, { color }]}>{label}</Text>
+              {on ? (
+                <View style={[styles.indicator, neonGlow(colors.neonPink, 3)]} />
+              ) : (
+                <View style={styles.indicatorSpacer} />
+              )}
+            </View>
           </Pressable>
         );
       })}
@@ -56,12 +66,22 @@ const styles = StyleSheet.create({
     borderTopColor: withAlpha(colors.electricBlue, 0.09),
     backgroundColor: withAlpha(colors.backgroundSecondary, 0.93),
     paddingTop: 6,
+    zIndex: 20,
+    elevation: 20,
   },
   item: {
     flex: 1,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+  },
+  itemPressed: {
+    opacity: 0.75,
+  },
+  itemInner: {
     alignItems: 'center',
     gap: 3,
-    paddingVertical: 3,
   },
   indicator: {
     width: 18,

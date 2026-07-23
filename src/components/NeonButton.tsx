@@ -20,6 +20,7 @@ type Props = {
   fullWidth?: boolean;
   icon?: React.ReactNode;
   style?: ViewStyle;
+  disabled?: boolean;
 };
 
 const SIZE_MAP = {
@@ -36,6 +37,7 @@ export function NeonButton({
   fullWidth = true,
   icon,
   style,
+  disabled = false,
 }: Props) {
   const scale = useRef(new Animated.Value(1)).current;
   const cfg = SIZE_MAP[size];
@@ -49,15 +51,24 @@ export function NeonButton({
   };
 
   return (
-    <Animated.View style={[{ transform: [{ scale }], width: fullWidth ? '100%' : undefined }, style]}>
-      <Pressable
-        accessibilityRole="button"
-        onPress={onPress}
-        onPressIn={() => animateTo(0.95)}
-        onPressOut={() => animateTo(1)}
-        style={({ pressed }) => [styles.pressable, pressed && styles.pressed]}
-      >
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      hitSlop={8}
+      onPress={onPress}
+      onPressIn={() => {
+        if (!disabled) animateTo(0.95);
+      }}
+      onPressOut={() => animateTo(1)}
+      style={[
+        styles.outer,
+        fullWidth ? styles.fullWidth : null,
+        style,
+      ]}
+    >
+      <Animated.View style={{ transform: [{ scale }], width: '100%' }}>
         <LinearGradient
+          pointerEvents="none"
           colors={[withAlpha(color, 0.8), withAlpha(color, 0.53)]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -68,32 +79,35 @@ export function NeonButton({
               paddingVertical: cfg.padV,
               paddingHorizontal: cfg.padH,
               ...neonGlow(color, 14),
+              opacity: disabled ? 0.5 : 1,
             },
           ]}
         >
-          <View style={styles.row}>
+          <View pointerEvents="none" style={styles.row}>
             {icon ? <View style={styles.icon}>{icon}</View> : null}
             <Text style={cfg.text}>{label}</Text>
           </View>
         </LinearGradient>
-      </Pressable>
-    </Animated.View>
+      </Animated.View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  pressable: {
+  outer: {
+    minHeight: 44,
     borderRadius: radii.button,
-    overflow: 'hidden',
   },
-  pressed: {
-    opacity: 0.95,
+  fullWidth: {
+    width: '100%',
   },
   gradient: {
     borderRadius: radii.button,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 44,
+    overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',

@@ -9,6 +9,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Zap } from 'lucide-react-native';
+import { AnimatedNeonBackground } from '../components/AnimatedNeonBackground';
 import { GridBackground } from '../components/GridBackground';
 import { NumberRushLogo } from '../components/NumberRushLogo';
 import { PerspectiveGrid } from '../components/PerspectiveGrid';
@@ -45,75 +46,97 @@ export function SplashScreen({ navigation }: Props) {
   }, [pulse]);
 
   const start = () => {
+    console.log('Splash pressed');
     if (navigating.current) return;
     navigating.current = true;
     navigation.replace('MainMenu');
   };
 
   return (
-    <Pressable style={styles.root} onPress={start} accessibilityRole="button" accessibilityLabel="Tap to start">
-      <View style={styles.glowBlob} />
-      <GridBackground opacity={0.05} />
-      <PerspectiveGrid />
+    <View style={styles.root}>
+      {/* Decorative layers — never receive touches */}
+      <View pointerEvents="none" style={styles.decorLayer}>
+        <View style={styles.glowBlob} />
+        <GridBackground opacity={0.05} />
+        <AnimatedNeonBackground intensity="splash" />
+        <PerspectiveGrid />
 
-      {DOTS.map((d, i) => (
-        <View
-          key={i}
-          pointerEvents="none"
-          style={[
-            styles.dot,
-            {
-              left: `${d.x * 100}%`,
-              top: `${d.y * 100}%`,
-              width: d.sz,
-              height: d.sz,
-              borderRadius: d.sz,
-              backgroundColor: d.c,
-              ...neonGlow(d.c, 6),
-            },
-          ]}
-        />
-      ))}
+        {DOTS.map((d, i) => (
+          <View
+            key={i}
+            style={[
+              styles.dot,
+              {
+                left: `${d.x * 100}%`,
+                top: `${d.y * 100}%`,
+                width: d.sz,
+                height: d.sz,
+                borderRadius: d.sz,
+                backgroundColor: d.c,
+                ...neonGlow(d.c, 6),
+              },
+            ]}
+          />
+        ))}
 
-      {Array.from({ length: 7 }).map((_, i) => (
-        <LinearGradient
-          key={`spark-${i}`}
-          colors={[i % 2 === 0 ? colors.neonPink : colors.cyan, 'transparent']}
-          style={[
-            styles.spark,
-            {
-              left: `${8 + i * 13}%`,
-              top: `${28 + (i % 4) * 8}%`,
-              height: 10 + (i % 3) * 7,
-              transform: [{ rotate: `${-25 + i * 8}deg` }],
-            },
-          ]}
-          pointerEvents="none"
-        />
-      ))}
+        {Array.from({ length: 7 }).map((_, i) => (
+          <LinearGradient
+            key={`spark-${i}`}
+            colors={[i % 2 === 0 ? colors.neonPink : colors.cyan, 'transparent']}
+            style={[
+              styles.spark,
+              {
+                left: `${8 + i * 13}%`,
+                top: `${28 + (i % 4) * 8}%`,
+                height: 10 + (i % 3) * 7,
+                transform: [{ rotate: `${-25 + i * 8}deg` }],
+              },
+            ]}
+          />
+        ))}
 
-      <View style={styles.center}>
-        <View style={styles.zapWrap}>
-          <Zap size={30} color={colors.yellow} />
+        <View style={styles.center}>
+          <View style={styles.zapWrap}>
+            <Zap size={30} color={colors.yellow} />
+          </View>
+          <NumberRushLogo />
+          <Text style={[typography.splashSubtitle, styles.subtitle]}>
+            PLACE. STACK. HIT THE TARGET.
+          </Text>
         </View>
-        <NumberRushLogo />
-        <Text style={[typography.splashSubtitle, styles.subtitle]}>
-          PLACE. STACK. HIT THE TARGET.
-        </Text>
+
+        <LinearGradient
+          colors={[
+            'transparent',
+            withAlpha(colors.neonPink, 0.53),
+            withAlpha(colors.electricBlue, 0.53),
+            'transparent',
+          ]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={[styles.platform, neonGlow(colors.neonPink, 8)]}
+        />
+
+        <Animated.Text
+          style={[
+            typography.tapToStart,
+            styles.tap,
+            { opacity: pulse },
+            neonGlow(colors.neonPink, 5),
+          ]}
+        >
+          TAP TO START
+        </Animated.Text>
       </View>
 
-      <LinearGradient
-        colors={['transparent', withAlpha(colors.neonPink, 0.53), withAlpha(colors.electricBlue, 0.53), 'transparent']}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={[styles.platform, neonGlow(colors.neonPink, 8)]}
-        pointerEvents="none"
+      {/* Full-screen interaction layer on top of visuals */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Tap to start"
+        onPress={start}
+        style={styles.touchLayer}
       />
-
-      <Animated.Text style={[typography.tapToStart, styles.tap, { opacity: pulse }, neonGlow(colors.neonPink, 5)]}>
-        TAP TO START
-      </Animated.Text>
-    </Pressable>
+    </View>
   );
 }
 
@@ -122,6 +145,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     overflow: 'hidden',
+  },
+  decorLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  touchLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 50,
   },
   glowBlob: {
     position: 'absolute',

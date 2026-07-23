@@ -15,17 +15,19 @@ export function NeonIconButton({
   color = colors.electricBlue,
   children,
   style,
-  size = 36,
+  size = 44,
 }: Props) {
+  const dim = Math.max(44, size);
   return (
     <Pressable
       accessibilityRole="button"
+      hitSlop={8}
       onPress={onPress}
       style={({ pressed }) => [
         styles.btn,
         {
-          width: size,
-          height: size,
+          width: dim,
+          height: dim,
           borderColor: withAlpha(color, 0.27),
           opacity: pressed ? 0.85 : 1,
         },
@@ -45,5 +47,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    minWidth: 44,
+    minHeight: 44,
   },
 });
