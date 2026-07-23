@@ -2,5 +2,19 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true
-  }
+  },
+  "include": [
+    "App.tsx",
+    "index.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "design_reference",
+    "ui",
+    "autoload",
+    "scripts",
+    "tools"
+  ]
 }
