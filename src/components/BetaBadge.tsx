@@ -1,15 +1,25 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { isPreviewBuild } from '../config/environment';
+import {
+  getReleaseChannel,
+  shouldShowNonProductionBadge,
+} from '../config/releaseChannel';
+import { useRemoteConfig } from '../hooks/useRemoteConfig';
 import { colors, fontFamilies, withAlpha } from '../theme';
 
 /**
- * Compact preview-only badge. Hidden in development and production.
+ * Non-production badge. Hidden in production channel / when remote config disables it.
  */
 export function BetaBadge() {
   const insets = useSafeAreaInsets();
-  if (!isPreviewBuild()) return null;
+  const { config } = useRemoteConfig();
+  const channel = getReleaseChannel();
+  if (!shouldShowNonProductionBadge(channel)) return null;
+  if (!config.beta.betaBadgeEnabled) return null;
+
+  const label =
+    channel === 'closed-beta' ? 'CLOSED BETA' : channel === 'preview' ? 'BETA' : 'DEV';
 
   return (
     <View
@@ -19,7 +29,7 @@ export function BetaBadge() {
       importantForAccessibility="no-hide-descendants"
       testID="beta-badge"
     >
-      <Text style={styles.text}>BETA</Text>
+      <Text style={styles.text}>{label}</Text>
     </View>
   );
 }

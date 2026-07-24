@@ -43,3 +43,7 @@ yarn-error.*
 /ios
 /android
 .env
+
+supabase/.temp/
+admin/node_modules/
+admin/.next/

@@ -58,7 +58,8 @@
     "test:ci": "jest --runInBand --coverage",
     "doctor": "npx expo-doctor",
     "validate": "npm run types && npm run test:ci",
-    "validate:assets": "node scripts/validateAssets.mjs"
+    "validate:assets": "node scripts/validateAssets.mjs",
+    "validate:rc": "node scripts/validateReleaseCandidate.mjs"
   },
   "private": true
 }

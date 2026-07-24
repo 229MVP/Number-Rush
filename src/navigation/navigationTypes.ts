@@ -8,6 +8,8 @@ export type RootStackParamList = {
     mode?: GameMode;
     seed?: string;
     officialAttempt?: boolean;
+    eventId?: string;
+    eventKey?: string;
   };
   GameOver: {
     finalScore: number;
@@ -39,6 +41,12 @@ export type RootStackParamList = {
   CloudSync: undefined;
   SyncConflict: { conflicts: SyncConflict[] };
   AuthCallback: { url?: string } | undefined;
+  Events: undefined;
+  EventDetail: { eventId: string; eventKey?: string };
+  News: undefined;
+  Maintenance: undefined;
+  UpdateRequired: undefined;
+  PlayerReport: undefined;
 };
 
 export type BottomNavRoute = 'MainMenu' | 'Missions' | 'Leaderboard' | 'Profile';

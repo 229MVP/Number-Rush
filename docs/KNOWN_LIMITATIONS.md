@@ -1,31 +1,18 @@
-# Number Rush — Known Limitations (Connected Backend + Monetization Phase)
+# Number Rush — Known Limitations (Live Ops phase)
 
 ## Product
+- Live Ops client architecture present (remote config, events, announcements, maintenance/min-version). Server tables are **local migrations only** until explicitly applied.
+- Admin dashboard is a separate `admin/` app scaffold — operators require `operator_roles`; **no service-role key in browser**.
+- Season soft-reset / next-season seeding not fully automated in finalize beyond snapshot + complete.
+- No live chat, clans, gambling, cash prizes, or realtime PvP.
 
-- **No social friends**, chat, or live head-to-head multiplayer.
-- **Ads / IAP client architecture is present** (AdMob + RevenueCat) but uses **test AdMob IDs**, feature flags, and **MONETIZATION TEST MODE** until production keys, store products, consent messages, and SSV/webhook verification are confirmed. See `docs/monetization-completion-report.md`.
-- **Number Rush Club subscription is disabled** (`subscriptionsEnabled` default false).
-- Local Supabase monetization migrations (`0016`–`0021`) and Edge Functions are **not applied remotely** without explicit confirmation on a Number Rush project.
-- **No cash prizes / gambling / pay-to-win competitive advantages.**
-- **No push notifications.**
-- Practice Daily scores remain **local**.
-- Ranked season reset is **not automated**.
-- Anti-cheat is **basic server replay**, not enterprise fraud detection.
-- Advanced moderation dashboard is not built.
-- Real ads and store purchases **cannot be fully tested in Expo Go** — require an EAS development client.
+## Store / identity
+- `android.package` / `ios.bundleIdentifier` still **MISSING**.
+- Privacy/Terms often unhosted drafts.
 
-## Backend / accounts
+## Monetization
+- Test AdMob IDs / sandbox purchases until production confirmation.
+- Club subscription disabled by default.
 
-- Cloud features require a **dedicated Number Rush Supabase project** (not applied remotely in this PR).
-- Until URL + anon key are configured, the app stays in **local/guest** mode.
-- Account recovery depends on **email access** (magic link).
-- SQL/RLS integration tests and Edge Function deploys are **not yet executed** against a live Number Rush project (including monetization SQL/Edge — see `docs/monetization-test-plan.md`).
-- Ranked match results still finish through local reward paths; **server validate-run** must be deployed for trusted RP.
-
-## Store / ops
-
-- `android.package` and `ios.bundleIdentifier` remain **MISSING**.
-- Placeholder audio / splash art quality.
-- Maestro E2E not run on device.
-- Privacy / Terms remain **DRAFT** until hosted URLs exist.
-- AdMob SSV ECDSA verification and RevenueCat sandbox fulfillment **not proven** in this environment.
+## Ops
+- Do not claim public launch readiness until RC checklist, store IDs, legal URLs, RLS tests, and staged rollout criteria PASS.
