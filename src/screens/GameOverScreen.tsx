@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Heart, Home, RotateCcw } from 'lucide-react-native';
@@ -7,7 +7,10 @@ import { AnimatedNeonBackground } from '../components/AnimatedNeonBackground';
 import { GridBackground } from '../components/GridBackground';
 import { NeonButton } from '../components/NeonButton';
 import { PerspectiveGrid } from '../components/PerspectiveGrid';
+import { RewardSummaryCard } from '../components/RewardSummaryCard';
 import type { RootStackParamList } from '../navigation/navigationTypes';
+import type { AppliedRunReward } from '../progression/progressionTypes';
+import { applyRunRewardsOnce } from '../progression/applyRunRewards';
 import { colors, fontFamilies, neonGlow, radii, spacing, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GameOver'>;
@@ -18,10 +21,54 @@ export function GameOverScreen({ navigation, route }: Props) {
     finalScore,
     bestScore,
     maxComboMultiplier,
+    longestPerfectStreak,
     perfectClears,
     tilesPlaced,
     isNewBest,
+    rewardKey,
+    multipliersUsed,
+    swapsUsed,
   } = route.params;
+
+  const [reward, setReward] = useState<AppliedRunReward | null>(null);
+  const [loadingReward, setLoadingReward] = useState(true);
+  const appliedRef = useRef(false);
+
+  useEffect(() => {
+    if (appliedRef.current) return;
+    appliedRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await applyRunRewardsOnce({
+          mode: 'classic',
+          score: finalScore,
+          perfectClears,
+          transactionId: rewardKey,
+          maxComboMultiplier,
+          longestPerfectStreak,
+          tilesPlaced,
+          multipliersUsed,
+          swapsUsed,
+        });
+        if (!cancelled) setReward(result);
+      } finally {
+        if (!cancelled) setLoadingReward(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    finalScore,
+    perfectClears,
+    rewardKey,
+    maxComboMultiplier,
+    longestPerfectStreak,
+    tilesPlaced,
+    multipliersUsed,
+    swapsUsed,
+  ]);
 
   const stats = [
     { label: 'MAX COMBO', value: `x${maxComboMultiplier}`, color: colors.cyan },
@@ -38,7 +85,10 @@ export function GameOverScreen({ navigation, route }: Props) {
         <PerspectiveGrid />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={[styles.title, neonGlow(colors.red, 16)]}>RUN OVER</Text>
         <View style={styles.hearts}>
           {[0, 1, 2].map((i) => (
@@ -79,6 +129,8 @@ export function GameOverScreen({ navigation, route }: Props) {
           ))}
         </View>
 
+        <RewardSummaryCard result={reward} loading={loadingReward} />
+
         <View style={styles.actions}>
           <NeonButton
             label="PLAY AGAIN"
@@ -96,7 +148,7 @@ export function GameOverScreen({ navigation, route }: Props) {
             onPress={() => navigation.navigate('MainMenu')}
           />
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -114,12 +166,12 @@ const styles = StyleSheet.create({
     backgroundColor: withAlpha(colors.red, 0.1),
   },
   content: {
-    flex: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: 20,
     alignItems: 'center',
     gap: 14,
     zIndex: 5,
+    paddingBottom: 28,
   },
   title: {
     fontFamily: fontFamilies.orbitronBlack,

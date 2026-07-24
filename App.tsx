@@ -23,6 +23,7 @@ import {
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { GameThemeProvider } from './src/themes/GameThemeProvider';
 import { colors } from './src/theme';
 
 export default function App() {
@@ -53,8 +54,10 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
-      <AppNavigator />
+      <GameThemeProvider>
+        <StatusBar style="light" />
+        <AppNavigator />
+      </GameThemeProvider>
     </SafeAreaProvider>
   );
 }

@@ -53,14 +53,19 @@ export type NewRunState = {
 
 export function createNewRun(
   config: RunConfiguration = getClassicConfig(),
+  startingInventory?: { multiplier: number; swap: number },
 ): NewRunState {
   const tileGenerator = config.seed
     ? TileGenerator.fromSeed(config.seed)
     : new TileGenerator();
   const currentTile = tileGenerator.next();
   const nextTile = tileGenerator.next();
-  const powerQty = config.powerUpsEnabled ? MULTIPLIER_STARTING_QUANTITY : 0;
-  const swapQty = config.powerUpsEnabled ? SWAP_STARTING_QUANTITY : 0;
+  const powerQty = config.powerUpsEnabled
+    ? (startingInventory?.multiplier ?? MULTIPLIER_STARTING_QUANTITY)
+    : 0;
+  const swapQty = config.powerUpsEnabled
+    ? (startingInventory?.swap ?? SWAP_STARTING_QUANTITY)
+    : 0;
   return {
     lanes: createEmptyLanes(),
     score: 0,
@@ -70,9 +75,9 @@ export function createNewRun(
     currentTile,
     nextTile,
     runStats: createEmptyRunStats(),
-    multiplierQuantity: powerQty,
+    multiplierQuantity: Math.max(0, powerQty),
     multiplierSelected: false,
-    swapQuantity: swapQty,
+    swapQuantity: Math.max(0, swapQty),
     tileGenerator,
     config,
   };

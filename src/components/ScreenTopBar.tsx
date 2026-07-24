@@ -6,26 +6,32 @@ import { colors, fontFamilies, withAlpha } from '../theme';
 
 type Props = {
   title: string;
-  onBack: () => void;
+  onBack?: () => void;
   accent?: string;
+  right?: React.ReactNode;
 };
 
 export function ScreenTopBar({
   title,
   onBack,
   accent = colors.electricBlue,
+  right,
 }: Props) {
   return (
     <View style={styles.topBar}>
-      <NeonIconButton accessibilityLabel="Back" color={accent} onPress={onBack}>
-        <ArrowLeft size={17} color={accent} />
-      </NeonIconButton>
+      {onBack ? (
+        <NeonIconButton accessibilityLabel="Back" color={accent} onPress={onBack}>
+          <ArrowLeft size={17} color={accent} />
+        </NeonIconButton>
+      ) : (
+        <View style={styles.spacer} />
+      )}
       <Text
         style={[styles.topTitle, { textShadowColor: withAlpha(accent, 0.55) }]}
       >
         {title}
       </Text>
-      <View style={styles.spacer} />
+      {right ? <View style={styles.right}>{right}</View> : <View style={styles.spacer} />}
     </View>
   );
 }
@@ -51,4 +57,9 @@ const styles = StyleSheet.create({
     textShadowRadius: 5,
   },
   spacer: { width: 36 },
+  right: {
+    minWidth: 36,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
 });

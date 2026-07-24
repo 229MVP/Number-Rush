@@ -79,6 +79,9 @@ export type GameOverPayload = {
   perfectClears: number;
   tilesPlaced: number;
   isNewBest: boolean;
+  rewardKey: string;
+  multipliersUsed: number;
+  swapsUsed: number;
 };
 
 export type GameMode = 'classic' | 'daily';
@@ -148,4 +151,5 @@ export type DailyResultsParams = {
   calculatedRank: number | null;
   isNewDailyBest: boolean;
   allTimeBest: number | null;
+  rewardKey: string;
 };

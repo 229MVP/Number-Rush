@@ -40,6 +40,11 @@ import {
   updateDailyAllTimeBest,
 } from '../storage/dailyStorage';
 import { updateBestScoreIfNeeded } from '../storage/gameStorage';
+import {
+  getPlayerInventory,
+  updateInventoryItem,
+} from '../storage/playerStorage';
+import { createTransactionId } from '../storage/playerStorage';
 
 type TravelState = {
   laneIndex: number;
@@ -70,7 +75,7 @@ type State = {
 };
 
 type Action =
-  | { type: 'RESTART'; config: RunConfiguration }
+  | { type: 'RESTART'; config: RunConfiguration; inventory?: { multiplier: number; swap: number } }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'TOGGLE_MULTIPLIER' }
@@ -85,18 +90,25 @@ type Action =
   | { type: 'CLEAR_LANE_FEEDBACK'; laneIndex: number; resetTotal: boolean }
   | { type: 'ADD_POPUP'; popup: FloatingPopup }
   | { type: 'REMOVE_POPUP'; id: string }
-  | { type: 'SET_GAME_OVER' };
+  | { type: 'SET_GAME_OVER' }
+  | { type: 'SET_POWER_QTY'; multiplier: number; swap: number };
 
 let activeGenerator = createNewRun(getClassicConfig()).tileGenerator;
 
-function restartWithConfig(config: RunConfiguration): ReturnType<typeof createNewRun> {
-  const run = createNewRun(config);
+function restartWithConfig(
+  config: RunConfiguration,
+  inventory?: { multiplier: number; swap: number },
+): ReturnType<typeof createNewRun> {
+  const run = createNewRun(config, inventory);
   activeGenerator = run.tileGenerator;
   return run;
 }
 
-function buildFreshState(config: RunConfiguration): State {
-  const run = restartWithConfig(config);
+function buildFreshState(
+  config: RunConfiguration,
+  inventory?: { multiplier: number; swap: number },
+): State {
+  const run = restartWithConfig(config, inventory);
   return {
     lanes: run.lanes,
     score: run.score,
@@ -123,7 +135,13 @@ function buildFreshState(config: RunConfiguration): State {
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'RESTART':
-      return buildFreshState(action.config);
+      return buildFreshState(action.config, action.inventory);
+    case 'SET_POWER_QTY':
+      return {
+        ...state,
+        multiplierQuantity: action.multiplier,
+        swapQuantity: action.swap,
+      };
     case 'PAUSE': {
       if (state.gameStatus !== 'playing' && state.gameStatus !== 'resolving') {
         return state;
@@ -324,6 +342,8 @@ export function useNumberRushGame({
   onDailyCompleteRef.current = onDailyComplete;
   const placingRef = useRef(false);
   const finishingRef = useRef(false);
+  const inventoryRef = useRef<{ multiplier: number; swap: number } | null>(null);
+  const usageRef = useRef({ multipliersUsed: 0, swapsUsed: 0 });
 
   const clearTimers = useCallback(() => {
     timers.current.forEach(clearTimeout);
@@ -332,11 +352,33 @@ export function useNumberRushGame({
 
   useEffect(() => () => clearTimers(), [clearTimers]);
 
+  const loadInventoryAndRestart = useCallback(
+    async (config: RunConfiguration) => {
+      usageRef.current = { multipliersUsed: 0, swapsUsed: 0 };
+      if (config.powerUpsEnabled) {
+        const inv = await getPlayerInventory();
+        inventoryRef.current = {
+          multiplier: inv.multiplier,
+          swap: inv.swap,
+        };
+        dispatch({
+          type: 'RESTART',
+          config,
+          inventory: inventoryRef.current,
+        });
+      } else {
+        inventoryRef.current = null;
+        dispatch({ type: 'RESTART', config });
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     clearTimers();
     placingRef.current = false;
     finishingRef.current = false;
-    dispatch({ type: 'RESTART', config: configuration });
+    void loadInventoryAndRestart(configuration);
   }, [
     configuration.mode,
     configuration.seed,
@@ -346,6 +388,7 @@ export function useNumberRushGame({
     configuration.maximumStrikes,
     configuration.targetValue,
     clearTimers,
+    loadInventoryAndRestart,
   ]);
 
   const schedule = useCallback((fn: () => void, ms: number) => {
@@ -375,6 +418,11 @@ export function useNumberRushGame({
       perfectClears: stats.perfectClears,
       tilesPlaced: stats.tilesPlaced,
       isNewBest,
+      rewardKey: createTransactionId(
+        `classic-${stats.score}-${stats.tilesPlaced}`,
+      ),
+      multipliersUsed: usageRef.current.multipliersUsed,
+      swapsUsed: usageRef.current.swapsUsed,
     });
   }, []);
 
@@ -417,6 +465,9 @@ export function useNumberRushGame({
           calculatedRank: rank,
           isNewDailyBest,
           allTimeBest: allTimeBest.score,
+          rewardKey: createTransactionId(
+            `daily-official-${dateKey}-${record.score}`,
+          ),
         });
         return;
       }
@@ -445,6 +496,9 @@ export function useNumberRushGame({
         calculatedRank: rank,
         isNewDailyBest: isNew,
         allTimeBest: allTimeBest.score,
+        rewardKey: createTransactionId(
+          `daily-practice-${dateKey}-${stats.score}-${Date.now()}`,
+        ),
       });
     },
     [],
@@ -470,7 +524,16 @@ export function useNumberRushGame({
       if (state.gameStatus !== 'playing') return;
       if (state.swapMode !== 'off') {
         const modeBefore = state.swapMode;
+        const willConsumeSwap =
+          modeBefore === 'selectSecond' &&
+          state.selectedSwapLane != null &&
+          state.selectedSwapLane !== laneIndex &&
+          state.lanes[laneIndex]?.status !== 'frozen';
         dispatch({ type: 'SELECT_SWAP_LANE', laneIndex });
+        if (willConsumeSwap) {
+          usageRef.current.swapsUsed += 1;
+          void updateInventoryItem('swap', -1);
+        }
         if (modeBefore === 'selectSecond') {
           schedule(() => dispatch({ type: 'CLEAR_SWAP_HIGHLIGHT' }), 350);
         }
@@ -503,6 +566,11 @@ export function useNumberRushGame({
         });
 
         dispatch({ type: 'APPLY_PLACE', result });
+
+        if (result.consumedMultiplier) {
+          usageRef.current.multipliersUsed += 1;
+          void updateInventoryItem('multiplier', -1);
+        }
 
         if (result.outcome === 'perfect') {
           addPopup(`PERFECT +${result.pointsAwarded}`, laneIndex, 'perfect');
@@ -579,8 +647,8 @@ export function useNumberRushGame({
     clearTimers();
     placingRef.current = false;
     finishingRef.current = false;
-    dispatch({ type: 'RESTART', config: cfg });
-  }, [clearTimers]);
+    void loadInventoryAndRestart(cfg);
+  }, [clearTimers, loadInventoryAndRestart]);
 
   const quitGame = useCallback(() => {
     clearTimers();

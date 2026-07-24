@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -6,8 +6,11 @@ import { Home, RotateCcw, Star, Zap } from 'lucide-react-native';
 import { AnimatedNeonBackground } from '../components/AnimatedNeonBackground';
 import { GridBackground } from '../components/GridBackground';
 import { NeonButton } from '../components/NeonButton';
+import { RewardSummaryCard } from '../components/RewardSummaryCard';
 import { getDailySeed } from '../game/dailyTournament';
 import type { RootStackParamList } from '../navigation/navigationTypes';
+import type { AppliedRunReward } from '../progression/progressionTypes';
+import { applyRunRewardsOnce } from '../progression/applyRunRewards';
 import { colors, fontFamilies, neonGlow, radii, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DailyResults'>;
@@ -28,6 +31,36 @@ export function DailyResultsScreen({ navigation, route }: Props) {
   const isOfficial = p.officialAttempt;
   const headline = isOfficial ? 'DAILY COMPLETE' : 'PRACTICE COMPLETE';
   const headlineColor = isOfficial ? colors.orange : colors.cyan;
+  const [reward, setReward] = useState<AppliedRunReward | null>(null);
+  const [loadingReward, setLoadingReward] = useState(true);
+  const appliedRef = useRef(false);
+
+  useEffect(() => {
+    if (appliedRef.current) return;
+    appliedRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await applyRunRewardsOnce({
+          mode: 'daily',
+          score: p.score,
+          perfectClears: p.perfectClears,
+          officialAttempt: p.officialAttempt,
+          calculatedRank: p.calculatedRank,
+          transactionId: p.rewardKey,
+          maxComboMultiplier: p.maxComboMultiplier,
+          longestPerfectStreak: p.longestPerfectStreak,
+          tilesPlaced: p.tilesPlaced,
+        });
+        if (!cancelled) setReward(result);
+      } finally {
+        if (!cancelled) setLoadingReward(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [p]);
 
   const startPractice = () => {
     navigation.replace('Gameplay', {
@@ -128,6 +161,8 @@ export function DailyResultsScreen({ navigation, route }: Props) {
             value={p.allTimeBest != null ? formatScore(p.allTimeBest) : '—'}
           />
         </View>
+
+        <RewardSummaryCard result={reward} loading={loadingReward} />
 
         <View style={styles.actions}>
           <NeonButton

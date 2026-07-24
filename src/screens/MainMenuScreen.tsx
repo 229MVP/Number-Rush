@@ -15,23 +15,41 @@ import { PerspectiveGrid } from '../components/PerspectiveGrid';
 import { getUtcDateKey } from '../game/dailyTournament';
 import type { BottomNavRoute, RootStackParamList } from '../navigation/navigationTypes';
 import { hasCompletedOfficialDailyAttempt } from '../storage/dailyStorage';
+import { countClaimableMissions } from '../storage/missionStorage';
+import { getPlayerProfile } from '../storage/playerStorage';
+import { useOptionalGameTheme } from '../themes/GameThemeProvider';
 import { colors, fontFamilies, spacing, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MainMenu'>;
 
 export function MainMenuScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const themeCtx = useOptionalGameTheme();
+  const refreshThemes = themeCtx?.refreshThemes;
   const [dailyBadge, setDailyBadge] = useState<'NEW' | 'DONE' | null>(null);
+  const [coins, setCoins] = useState(500);
+  const [gems, setGems] = useState(25);
+  const [level, setLevel] = useState(1);
+  const [claimable, setClaimable] = useState(0);
 
-  const refreshBadge = useCallback(async () => {
-    const done = await hasCompletedOfficialDailyAttempt(getUtcDateKey());
+  const refresh = useCallback(async () => {
+    const [done, profile, claimCount] = await Promise.all([
+      hasCompletedOfficialDailyAttempt(getUtcDateKey()),
+      getPlayerProfile(),
+      countClaimableMissions(),
+    ]);
     setDailyBadge(done ? 'DONE' : 'NEW');
-  }, []);
+    setCoins(profile.coins);
+    setGems(profile.gems);
+    setLevel(profile.level);
+    setClaimable(claimCount);
+    await refreshThemes?.();
+  }, [refreshThemes]);
 
   useFocusEffect(
     useCallback(() => {
-      void refreshBadge();
-    }, [refreshBadge]),
+      void refresh();
+    }, [refresh]),
   );
 
   const onBottomNav = (route: BottomNavRoute) => {
@@ -39,17 +57,33 @@ export function MainMenuScreen({ navigation }: Props) {
     navigation.navigate(route);
   };
 
+  const bg = themeCtx?.themeColors.background ?? colors.background;
+  const accent = themeCtx?.themeColors.neonPink ?? colors.neonPink;
+
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: bg }]}>
       <View style={[styles.decorLayer, { pointerEvents: 'none' }]}>
         <GridBackground opacity={0.05} />
-        <View style={styles.menuGlow} />
+        <View
+          style={[
+            styles.menuGlow,
+            { backgroundColor: withAlpha(themeCtx?.themeColors.purple ?? colors.purple, 0.1) },
+          ]}
+        />
         <AnimatedNeonBackground intensity="menu" />
         <PerspectiveGrid />
       </View>
 
       <View style={[styles.topRow, { pointerEvents: 'box-none' }]}>
-        <CurrencyChip />
+        <View style={styles.topLeft}>
+          <CurrencyChip coins={coins} gems={gems} />
+          <View
+            pointerEvents="none"
+            style={[styles.levelChip, { borderColor: withAlpha(accent, 0.45) }]}
+          >
+            <Text style={[styles.levelText, { color: accent }]}>LV {level}</Text>
+          </View>
+        </View>
         <NeonIconButton
           accessibilityLabel="Settings"
           onPress={() => navigation.navigate('Settings')}
@@ -67,7 +101,7 @@ export function MainMenuScreen({ navigation }: Props) {
         <View style={[styles.buttons, { pointerEvents: 'box-none' }]}>
           <NeonButton
             label="PLAY"
-            color={colors.neonPink}
+            color={accent}
             size="large"
             icon={<Play size={17} color={colors.white} />}
             onPress={() =>
@@ -111,7 +145,11 @@ export function MainMenuScreen({ navigation }: Props) {
         </View>
       </View>
 
-      <BottomNavigation activeRoute="MainMenu" onNavigate={onBottomNav} />
+      <BottomNavigation
+        activeRoute="MainMenu"
+        onNavigate={onBottomNav}
+        missionsBadgeCount={claimable}
+      />
     </View>
   );
 }
@@ -137,6 +175,23 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     zIndex: 10,
   },
+  topLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  levelChip: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: colors.card,
+  },
+  levelText: {
+    fontFamily: fontFamilies.orbitronBold,
+    fontSize: 10,
+    letterSpacing: 0.5,
+  },
   content: {
     flex: 1,
     paddingHorizontal: spacing.screenPadding,
@@ -149,7 +204,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: withAlpha(colors.purple, 0.1),
     opacity: 0.85,
   },
   logoWrap: {
