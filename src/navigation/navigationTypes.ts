@@ -23,7 +23,7 @@ export type RootStackParamList = {
   Tournament: undefined;
   DailyResults: DailyResultsParams;
   Ranked: undefined;
-  Shop: undefined;
+  Shop: { initialTab?: 'powerup' | 'theme' | 'coins' | 'gems' } | undefined;
   Settings: undefined;
   Missions: undefined;
   Leaderboard: undefined;

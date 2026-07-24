@@ -24,6 +24,8 @@ import {
   getPlayerProfile,
 } from '../storage/playerStorage';
 import { GAME_THEMES, type GameTheme } from '../themes/gameThemes';
+import { useOptionalAudio } from '../audio/AudioProvider';
+import { useOptionalHaptics } from '../haptics/HapticsProvider';
 import { useGameTheme } from '../themes/GameThemeProvider';
 import { colors, fontFamilies, neonGlow, radii, withAlpha } from '../theme';
 
@@ -44,10 +46,12 @@ function ownedForItem(item: ShopItem, inv: PlayerInventory): number | null {
   return inv[key];
 }
 
-export function ShopScreen({ navigation }: Props) {
+export function ShopScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const audio = useOptionalAudio();
+  const haptics = useOptionalHaptics();
   const { selectTheme, refreshThemes } = useGameTheme();
-  const [tab, setTab] = useState<Tab>('powerup');
+  const [tab, setTab] = useState<Tab>(route.params?.initialTab ?? 'powerup');
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [inventory, setInventory] = useState<PlayerInventory | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -90,6 +94,8 @@ export function ShopScreen({ navigation }: Props) {
                   setProfile(result.profile);
                   setInventory(result.inventory);
                   setFeedback(`Purchased ${item.name}`);
+                  audio?.playSound('purchase');
+                  haptics?.success();
                   await refreshThemes();
                 }
               } finally {

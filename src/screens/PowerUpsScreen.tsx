@@ -24,11 +24,13 @@ import { colors, fontFamilies, neonGlow, radii, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PowerUps'>;
 
+type AvailLabel = 'USABLE IN CLASSIC' | 'DISABLED IN DAILY' | 'DISABLED IN RANKED';
+
 type PowerRow = {
   key: keyof PlayerInventory;
   name: string;
   description: string;
-  status: 'AVAILABLE' | 'COMING TO GAMEPLAY';
+  labels: AvailLabel[];
   color: string;
   icon: 'x2' | 'swap' | 'bomb' | 'freeze' | 'shield' | 'wild';
 };
@@ -37,60 +39,60 @@ const ROWS: PowerRow[] = [
   {
     key: 'multiplier',
     name: 'MULTIPLIER',
-    description: 'Double a tile value in Classic mode.',
-    status: 'AVAILABLE',
+    description: 'Double the next tile value.',
+    labels: ['USABLE IN CLASSIC', 'DISABLED IN DAILY', 'DISABLED IN RANKED'],
     color: colors.orange,
     icon: 'x2',
   },
   {
     key: 'swap',
     name: 'SWAP',
-    description: 'Swap two lane totals in Classic mode.',
-    status: 'AVAILABLE',
+    description: 'Exchange the totals of two lanes.',
+    labels: ['USABLE IN CLASSIC', 'DISABLED IN DAILY', 'DISABLED IN RANKED'],
     color: colors.electricBlue,
     icon: 'swap',
   },
   {
     key: 'bomb',
-    name: 'BOMB TILE',
-    description: 'Clear a lane of your choice.',
-    status: 'COMING TO GAMEPLAY',
+    name: 'BOMB',
+    description: 'Clear one lane without placing a tile.',
+    labels: ['USABLE IN CLASSIC', 'DISABLED IN DAILY', 'DISABLED IN RANKED'],
     color: colors.red,
     icon: 'bomb',
   },
   {
     key: 'freeze',
-    name: 'FREEZE CARD',
-    description: 'Freeze pressure for a moment.',
-    status: 'COMING TO GAMEPLAY',
+    name: 'FREEZE',
+    description: 'Use the current tile for one extra turn.',
+    labels: ['USABLE IN CLASSIC', 'DISABLED IN DAILY', 'DISABLED IN RANKED'],
     color: colors.cyan,
     icon: 'freeze',
   },
   {
     key: 'shield',
     name: 'SHIELD',
-    description: 'Protect from a strike.',
-    status: 'COMING TO GAMEPLAY',
+    description: 'Block the next lost strike.',
+    labels: ['USABLE IN CLASSIC', 'DISABLED IN DAILY', 'DISABLED IN RANKED'],
     color: colors.electricBlue,
     icon: 'shield',
   },
   {
     key: 'wild',
-    name: 'WILD TILE',
-    description: 'Acts as the value you need.',
-    status: 'COMING TO GAMEPLAY',
+    name: 'WILD',
+    description: 'Choose a value from 1 through 10.',
+    labels: ['USABLE IN CLASSIC', 'DISABLED IN DAILY', 'DISABLED IN RANKED'],
     color: colors.purple,
     icon: 'wild',
   },
 ];
 
-function RowIcon({
-  icon,
-  color,
-}: {
-  icon: PowerRow['icon'];
-  color: string;
-}) {
+const LABEL_COLORS: Record<AvailLabel, string> = {
+  'USABLE IN CLASSIC': colors.green,
+  'DISABLED IN DAILY': colors.muted,
+  'DISABLED IN RANKED': colors.muted,
+};
+
+function RowIcon({ icon, color }: { icon: PowerRow['icon']; color: string }) {
   if (icon === 'x2') {
     return <Text style={[styles.x2, { color }]}>x2</Text>;
   }
@@ -100,6 +102,7 @@ function RowIcon({
   if (icon === 'bomb') return <Zap size={22} color={color} />;
   if (icon === 'freeze') return <Snowflake size={22} color={color} />;
   if (icon === 'shield') return <Shield size={22} color={color} />;
+  if (icon === 'wild') return <HelpCircle size={22} color={color} />;
   return <HelpCircle size={22} color={color} />;
 }
 
@@ -173,30 +176,33 @@ export function PowerUpsScreen({ navigation }: Props) {
                   >
                     <RowIcon icon={row.icon} color={row.color} />
                   </View>
+
                   <View style={styles.body}>
                     <Text style={[styles.name, { color: row.color }]}>
                       {row.name}
                     </Text>
                     <Text style={styles.desc}>{row.description}</Text>
-                    <Text
-                      style={[
-                        styles.status,
-                        {
-                          color:
-                            row.status === 'AVAILABLE'
-                              ? colors.green
-                              : colors.muted,
-                        },
-                      ]}
-                    >
-                      {row.status}
-                    </Text>
+                    <View style={styles.labelsRow}>
+                      {row.labels.map((lbl) => (
+                        <Text
+                          key={lbl}
+                          style={[styles.label, { color: LABEL_COLORS[lbl] }]}
+                        >
+                          {lbl}
+                        </Text>
+                      ))}
+                    </View>
                   </View>
+
                   <View style={styles.qtyCol}>
                     <Text style={styles.qty}>{qty}</Text>
                     <Text style={styles.owned}>OWNED</Text>
                     {low ? (
-                      <Pressable onPress={() => navigation.navigate('Shop')}>
+                      <Pressable
+                        onPress={() =>
+                          navigation.navigate('Shop', { initialTab: 'powerup' })
+                        }
+                      >
                         <Text style={styles.shopLink}>SHOP</Text>
                       </Pressable>
                     ) : null}
@@ -209,7 +215,7 @@ export function PowerUpsScreen({ navigation }: Props) {
         <NeonButton
           label="OPEN SHOP"
           color={colors.purple}
-          onPress={() => navigation.navigate('Shop')}
+          onPress={() => navigation.navigate('Shop', { initialTab: 'powerup' })}
         />
       </ScrollView>
     </View>
@@ -241,7 +247,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.orbitronBlack,
     fontSize: 18,
   },
-  body: { flex: 1, gap: 2 },
+  body: { flex: 1, gap: 3 },
   name: {
     fontFamily: fontFamilies.orbitronBold,
     fontSize: 12,
@@ -252,10 +258,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.muted,
   },
-  status: {
+  labelsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
+  label: {
     fontFamily: fontFamilies.rajdhaniBold,
-    fontSize: 10,
-    marginTop: 2,
+    fontSize: 9,
+    letterSpacing: 0.3,
   },
   qtyCol: { alignItems: 'center', minWidth: 52 },
   qty: {

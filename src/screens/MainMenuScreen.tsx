@@ -17,6 +17,8 @@ import type { BottomNavRoute, RootStackParamList } from '../navigation/navigatio
 import { hasCompletedOfficialDailyAttempt } from '../storage/dailyStorage';
 import { countClaimableMissions } from '../storage/missionStorage';
 import { getPlayerProfile } from '../storage/playerStorage';
+import { useOptionalAudio } from '../audio/AudioProvider';
+import { useReducedMotionPreference } from '../settings/SettingsProvider';
 import { useOptionalGameTheme } from '../themes/GameThemeProvider';
 import { colors, fontFamilies, spacing, withAlpha } from '../theme';
 
@@ -25,6 +27,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'MainMenu'>;
 export function MainMenuScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const themeCtx = useOptionalGameTheme();
+  const audio = useOptionalAudio();
+  const reducedMotion = useReducedMotionPreference();
   const refreshThemes = themeCtx?.refreshThemes;
   const [dailyBadge, setDailyBadge] = useState<'NEW' | 'DONE' | null>(null);
   const [coins, setCoins] = useState(500);
@@ -49,7 +53,8 @@ export function MainMenuScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       void refresh();
-    }, [refresh]),
+      void audio?.playMusic('menu');
+    }, [refresh, audio]),
   );
 
   const onBottomNav = (route: BottomNavRoute) => {
@@ -62,7 +67,11 @@ export function MainMenuScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top, backgroundColor: bg }]}>
-      <View style={[styles.decorLayer, { pointerEvents: 'none' }]}>
+      <View
+        style={[styles.decorLayer, { pointerEvents: 'none' }]}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+      >
         <GridBackground opacity={0.05} />
         <View
           style={[
@@ -70,7 +79,7 @@ export function MainMenuScreen({ navigation }: Props) {
             { backgroundColor: withAlpha(themeCtx?.themeColors.purple ?? colors.purple, 0.1) },
           ]}
         />
-        <AnimatedNeonBackground intensity="menu" />
+        <AnimatedNeonBackground intensity="menu" reducedMotion={reducedMotion} />
         <PerspectiveGrid />
       </View>
 

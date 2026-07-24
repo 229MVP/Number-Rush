@@ -37,7 +37,6 @@ import type {
 import type { RunPowerInventory } from '../game/powerUpInventory';
 import { toRunPowerInventory } from '../game/powerUpInventory';
 import {
-  getDailyAllTimeBest,
   getDailyPracticeRecord,
   getOfficialDailyRecord,
   saveDailyPracticeResult,
@@ -50,9 +49,6 @@ import {
   getPlayerInventory,
   updateInventoryItem,
 } from '../storage/playerStorage';
-
-// getDailyAllTimeBest kept in import for future usage tracking
-void getDailyAllTimeBest;
 
 type TravelState = {
   laneIndex: number;
@@ -935,7 +931,7 @@ export function useNumberRushGame({
     if (state.swapMode === 'selectFirst') return 'SELECT FIRST LANE';
     if (state.swapMode === 'selectSecond') return 'SELECT SECOND LANE';
     if (state.multiplierSelected) return 'X2 ACTIVE — TAP A LANE';
-    if (state.bombSelected) return 'SELECT LANE TO BOMB';
+    if (state.bombSelected) return 'SELECT A LANE TO CLEAR';
     if (state.freezeSelected) return 'FREEZE ACTIVE — TAP A LANE';
     if (state.wildSelected) {
       if (state.selectedWildValue != null) {

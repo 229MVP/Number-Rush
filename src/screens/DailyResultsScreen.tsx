@@ -7,6 +7,7 @@ import { AnimatedNeonBackground } from '../components/AnimatedNeonBackground';
 import { GridBackground } from '../components/GridBackground';
 import { NeonButton } from '../components/NeonButton';
 import { RewardSummaryCard } from '../components/RewardSummaryCard';
+import { useOptionalAudio } from '../audio/AudioProvider';
 import { getDailySeed } from '../game/dailyTournament';
 import type { RootStackParamList } from '../navigation/navigationTypes';
 import type { AppliedRunReward } from '../progression/progressionTypes';
@@ -27,7 +28,13 @@ function reasonLabel(reason: Props['route']['params']['completionReason']): stri
 
 export function DailyResultsScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const audio = useOptionalAudio();
   const p = route.params;
+
+  useEffect(() => {
+    void audio?.playMusic('results');
+    audio?.playSound('reward');
+  }, [audio]);
   const isOfficial = p.officialAttempt;
   const headline = isOfficial ? 'DAILY COMPLETE' : 'PRACTICE COMPLETE';
   const headlineColor = isOfficial ? colors.orange : colors.cyan;

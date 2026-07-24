@@ -23,7 +23,8 @@ export function MultiplierPowerUpButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Multiplier"
+      accessibilityLabel={`Double next tile, ${quantity} remaining`}
+      accessibilityState={{ disabled: unavailable && !selected, selected }}
       disabled={unavailable && !selected}
       onPress={onPress}
       style={[
@@ -75,7 +76,8 @@ export function SwapPowerUpButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Swap"
+      accessibilityLabel={`Swap two lane totals, ${quantity} remaining`}
+      accessibilityState={{ disabled: unavailable && !active, selected: active }}
       disabled={unavailable && !active}
       onPress={onPress}
       style={[

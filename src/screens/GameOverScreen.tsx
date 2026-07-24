@@ -8,6 +8,7 @@ import { GridBackground } from '../components/GridBackground';
 import { NeonButton } from '../components/NeonButton';
 import { PerspectiveGrid } from '../components/PerspectiveGrid';
 import { RewardSummaryCard } from '../components/RewardSummaryCard';
+import { useOptionalAudio } from '../audio/AudioProvider';
 import type { RootStackParamList } from '../navigation/navigationTypes';
 import type { AppliedRunReward } from '../progression/progressionTypes';
 import { applyRunRewardsOnce } from '../progression/applyRunRewards';
@@ -17,6 +18,12 @@ type Props = NativeStackScreenProps<RootStackParamList, 'GameOver'>;
 
 export function GameOverScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const audio = useOptionalAudio();
+
+  useEffect(() => {
+    void audio?.playMusic('results');
+    audio?.playSound('reward');
+  }, [audio]);
   const {
     finalScore,
     bestScore,

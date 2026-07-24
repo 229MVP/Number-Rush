@@ -50,10 +50,29 @@ export type FloatingPopup = {
   id: string;
   text: string;
   laneIndex: number;
-  kind: 'score' | 'perfect' | 'bust';
+  kind: 'score' | 'perfect' | 'bust' | 'shielded' | 'bomb';
 };
 
 export type SwapMode = 'off' | 'selectFirst' | 'selectSecond';
+
+export type PowerUpId =
+  | 'multiplier'
+  | 'swap'
+  | 'bomb'
+  | 'freeze'
+  | 'shield'
+  | 'wild';
+
+export type ActivePowerUpState = {
+  multiplierSelected: boolean;
+  swapMode: SwapMode;
+  selectedSwapLane: number | null;
+  bombSelected: boolean;
+  freezeSelected: boolean;
+  shieldArmed: boolean;
+  wildSelected: boolean;
+  selectedWildValue: number | null;
+};
 
 export type PlacementResult = {
   outcome: PlacementOutcome;
@@ -66,6 +85,10 @@ export type PlacementResult = {
   comboStreak: number;
   comboMultiplier: number;
   consumedMultiplier: boolean;
+  consumedFreeze: boolean;
+  consumedWild: boolean;
+  consumedShield: boolean;
+  shieldBlocked: boolean;
   gameOver: boolean;
   /** True when the run ends because the tile limit was hit on this placement. */
   tileLimitReached?: boolean;
