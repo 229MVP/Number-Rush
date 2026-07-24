@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Heart, Pause, Zap } from 'lucide-react-native';
+import { Heart, Pause, Shield, Zap } from 'lucide-react-native';
 import { colors, fontFamilies, neonGlow, withAlpha } from '../../theme';
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
@@ -16,6 +16,8 @@ type Props = {
   modeBadge?: string | null;
   attemptLabel?: string | null;
   tilesRemaining?: number | null;
+  shieldArmed?: boolean;
+  reducedMotion?: boolean;
 };
 
 export function GameplayHUD({
@@ -29,6 +31,8 @@ export function GameplayHUD({
   modeBadge = null,
   attemptLabel = null,
   tilesRemaining = null,
+  shieldArmed = false,
+  reducedMotion = false,
 }: Props) {
   const scoreScale = useRef(new Animated.Value(1)).current;
   const comboScale = useRef(new Animated.Value(1)).current;
@@ -86,10 +90,12 @@ export function GameplayHUD({
           ) : null}
         </View>
       )}
-      <View style={styles.hud}>
+      <View style={styles.hud} testID="gameplay-hud">
       <Pressable
+        testID="gameplay-pause"
         accessibilityRole="button"
-        accessibilityLabel="Pause"
+        accessibilityLabel="Pause game"
+        accessibilityState={{ disabled: pauseDisabled }}
         disabled={pauseDisabled}
         hitSlop={8}
         onPress={onPause}
@@ -123,21 +129,45 @@ export function GameplayHUD({
         </Animated.View>
       </View>
 
-      <View style={styles.stat}>
-        <Text style={[styles.label, { marginBottom: 2 }]}>STRIKES</Text>
-        <StrikeHearts remaining={strikesRemaining} />
+      <View
+        style={styles.stat}
+        accessible
+        accessibilityLabel={`${strikesRemaining} strikes remaining${
+          shieldArmed ? ', shield armed' : ''
+        }`}
+      >
+        <Text style={[styles.label, { marginBottom: 2 }]} importantForAccessibility="no">
+          STRIKES
+        </Text>
+        <View style={styles.strikesRow}>
+          <StrikeHearts remaining={strikesRemaining} reducedMotion={reducedMotion} />
+          {shieldArmed ? (
+            <View
+              style={[styles.shieldHud, neonGlow(colors.electricBlue, 6)]}
+              accessibilityLabel="Shield armed"
+            >
+              <Shield size={14} color={colors.electricBlue} />
+            </View>
+          ) : null}
+        </View>
       </View>
     </View>
     </View>
   );
 }
 
-function StrikeHearts({ remaining }: { remaining: number }) {
+function StrikeHearts({
+  remaining,
+  reducedMotion = false,
+}: {
+  remaining: number;
+  reducedMotion?: boolean;
+}) {
   const pulse = useRef(new Animated.Value(1)).current;
   const isLast = remaining === 1;
 
   useEffect(() => {
-    if (!isLast) {
+    if (!isLast || reducedMotion) {
       pulse.setValue(1);
       return;
     }
@@ -157,7 +187,7 @@ function StrikeHearts({ remaining }: { remaining: number }) {
     );
     loop.start();
     return () => loop.stop();
-  }, [isLast, pulse]);
+  }, [isLast, pulse, reducedMotion]);
 
   return (
     <View style={styles.hearts}>
@@ -279,6 +309,21 @@ const styles = StyleSheet.create({
   combo: {
     fontFamily: fontFamilies.orbitronExtraBold,
     fontSize: 17,
+  },
+  strikesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  shieldHud: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: colors.electricBlue,
+    backgroundColor: withAlpha(colors.electricBlue, 0.18),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   hearts: {
     flexDirection: 'row',

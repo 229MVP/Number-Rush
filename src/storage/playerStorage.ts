@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logger } from '../logging/logger';
 import { applyXp } from '../progression/xpSystem';
 import type {
   EconomyTransaction,
@@ -30,10 +31,10 @@ async function readJson<T>(key: string): Promise<T | null> {
     if (raw == null || raw === '') return null;
     return JSON.parse(raw) as T;
   } catch (error) {
-    if (typeof __DEV__ !== 'undefined' && __DEV__) {
-      // eslint-disable-next-line no-console
-      console.warn('[playerStorage] read failed', key, error);
-    }
+    logger.warn('playerStorage read failed', {
+      key,
+      message: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
@@ -43,10 +44,10 @@ async function writeJson(key: string, value: unknown): Promise<void> {
     try {
       await AsyncStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
-      if (typeof __DEV__ !== 'undefined' && __DEV__) {
-        // eslint-disable-next-line no-console
-        console.warn('[playerStorage] write failed', key, error);
-      }
+      logger.warn('playerStorage write failed', {
+        key,
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 }

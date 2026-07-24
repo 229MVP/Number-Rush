@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import {
+  BOMB_RESOLVE_DURATION,
   BUST_FEEDBACK_DURATION,
   NORMAL_FEEDBACK_DURATION,
   PERFECT_FEEDBACK_DURATION,
@@ -7,7 +8,9 @@ import {
   TILE_MOVE_DURATION,
 } from '../game/gameConstants';
 import {
+  clearLaneWithBomb,
   createNewRun,
+  effectiveTileValue,
   resolveLanePlacement,
   swapLaneTotals,
 } from '../game/gameEngine';
@@ -31,8 +34,9 @@ import type {
   RunStats,
   SwapMode,
 } from '../game/gameTypes';
+import type { RunPowerInventory } from '../game/powerUpInventory';
+import { toRunPowerInventory } from '../game/powerUpInventory';
 import {
-  getDailyAllTimeBest,
   getDailyPracticeRecord,
   getOfficialDailyRecord,
   saveDailyPracticeResult,
@@ -41,10 +45,10 @@ import {
 } from '../storage/dailyStorage';
 import { updateBestScoreIfNeeded } from '../storage/gameStorage';
 import {
+  createTransactionId,
   getPlayerInventory,
   updateInventoryItem,
 } from '../storage/playerStorage';
-import { createTransactionId } from '../storage/playerStorage';
 
 type TravelState = {
   laneIndex: number;
@@ -62,11 +66,24 @@ type State = {
   nextTile: NumberTileData;
   gameStatus: GameStatus;
   runStats: RunStats;
+  // Power-up quantities
   multiplierQuantity: number;
-  multiplierSelected: boolean;
   swapQuantity: number;
+  bombQuantity: number;
+  freezeQuantity: number;
+  shieldQuantity: number;
+  wildQuantity: number;
+  // Power-up selection states
+  multiplierSelected: boolean;
   swapMode: SwapMode;
   selectedSwapLane: number | null;
+  bombSelected: boolean;
+  freezeSelected: boolean;
+  shieldArmed: boolean;
+  wildSelected: boolean;
+  selectedWildValue: number | null;
+  bombPulseLane: number | null;
+  // UI state
   floatingPopups: FloatingPopup[];
   travel: TravelState;
   scorePulseKey: number;
@@ -74,30 +91,37 @@ type State = {
   config: RunConfiguration;
 };
 
+type PlaceResult = ReturnType<typeof resolveLanePlacement>;
+
 type Action =
-  | { type: 'RESTART'; config: RunConfiguration; inventory?: { multiplier: number; swap: number } }
+  | { type: 'RESTART'; config: RunConfiguration; inventory?: Partial<RunPowerInventory> }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'TOGGLE_MULTIPLIER' }
   | { type: 'TOGGLE_SWAP' }
+  | { type: 'TOGGLE_BOMB' }
+  | { type: 'TOGGLE_FREEZE' }
+  | { type: 'TOGGLE_SHIELD' }
+  | { type: 'OPEN_WILD' }
+  | { type: 'SET_WILD_VALUE'; value: number }
+  | { type: 'CANCEL_WILD' }
   | { type: 'SELECT_SWAP_LANE'; laneIndex: number }
   | { type: 'CLEAR_SWAP_HIGHLIGHT' }
+  | { type: 'APPLY_BOMB'; laneIndex: number }
+  | { type: 'CLEAR_BOMB_RESOLVE' }
   | { type: 'BEGIN_PLACE'; laneIndex: number }
-  | {
-      type: 'APPLY_PLACE';
-      result: ReturnType<typeof resolveLanePlacement>;
-    }
+  | { type: 'APPLY_PLACE'; result: PlaceResult }
   | { type: 'CLEAR_LANE_FEEDBACK'; laneIndex: number; resetTotal: boolean }
   | { type: 'ADD_POPUP'; popup: FloatingPopup }
   | { type: 'REMOVE_POPUP'; id: string }
   | { type: 'SET_GAME_OVER' }
-  | { type: 'SET_POWER_QTY'; multiplier: number; swap: number };
+  | { type: 'REVIVE_STRIKE' };
 
 let activeGenerator = createNewRun(getClassicConfig()).tileGenerator;
 
 function restartWithConfig(
   config: RunConfiguration,
-  inventory?: { multiplier: number; swap: number },
+  inventory?: Partial<RunPowerInventory>,
 ): ReturnType<typeof createNewRun> {
   const run = createNewRun(config, inventory);
   activeGenerator = run.tileGenerator;
@@ -106,7 +130,7 @@ function restartWithConfig(
 
 function buildFreshState(
   config: RunConfiguration,
-  inventory?: { multiplier: number; swap: number },
+  inventory?: Partial<RunPowerInventory>,
 ): State {
   const run = restartWithConfig(config, inventory);
   return {
@@ -120,10 +144,20 @@ function buildFreshState(
     gameStatus: 'playing',
     runStats: run.runStats,
     multiplierQuantity: run.multiplierQuantity,
-    multiplierSelected: run.multiplierSelected,
     swapQuantity: run.swapQuantity,
+    bombQuantity: run.bombQuantity,
+    freezeQuantity: run.freezeQuantity,
+    shieldQuantity: run.shieldQuantity,
+    wildQuantity: run.wildQuantity,
+    multiplierSelected: false,
     swapMode: 'off',
     selectedSwapLane: null,
+    bombSelected: false,
+    freezeSelected: false,
+    shieldArmed: false,
+    wildSelected: false,
+    selectedWildValue: null,
+    bombPulseLane: null,
     floatingPopups: [],
     travel: null,
     scorePulseKey: 0,
@@ -132,60 +166,160 @@ function buildFreshState(
   };
 }
 
+/** Clear all placement-modifying selections (multi/swap/bomb/freeze/wild). Shield is untouched. */
+function clearPlacementSelections(state: State): Partial<State> {
+  return {
+    multiplierSelected: false,
+    swapMode: 'off',
+    selectedSwapLane: null,
+    bombSelected: false,
+    freezeSelected: false,
+    wildSelected: false,
+    selectedWildValue: null,
+    lanes: state.lanes.map((l) =>
+      l.status === 'selected' ? { ...l, status: 'default' as const } : l,
+    ),
+  };
+}
+
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'RESTART':
       return buildFreshState(action.config, action.inventory);
-    case 'SET_POWER_QTY':
-      return {
-        ...state,
-        multiplierQuantity: action.multiplier,
-        swapQuantity: action.swap,
-      };
+
     case 'PAUSE': {
       if (state.gameStatus !== 'playing' && state.gameStatus !== 'resolving') {
         return state;
       }
       return {
         ...state,
+        ...clearPlacementSelections(state),
         gameStatus: 'paused',
-        multiplierSelected: false,
-        swapMode: 'off',
-        selectedSwapLane: null,
+        // shieldArmed intentionally preserved across pause
       };
     }
+
     case 'RESUME': {
       if (state.gameStatus !== 'paused') return state;
       return { ...state, gameStatus: 'playing' };
     }
+
     case 'TOGGLE_MULTIPLIER': {
       if (!state.config.powerUpsEnabled) return state;
       if (state.gameStatus !== 'playing') return state;
       if (state.swapMode !== 'off') return state;
-      if (state.multiplierQuantity <= 0) return state;
-      return { ...state, multiplierSelected: !state.multiplierSelected };
+      if (state.multiplierQuantity <= 0 && !state.multiplierSelected) return state;
+      return {
+        ...state,
+        multiplierSelected: !state.multiplierSelected,
+        bombSelected: false,
+        freezeSelected: false,
+        wildSelected: false,
+        selectedWildValue: null,
+      };
     }
+
     case 'TOGGLE_SWAP': {
       if (!state.config.powerUpsEnabled) return state;
       if (state.gameStatus !== 'playing') return state;
-      if (state.swapQuantity <= 0) return state;
       if (state.swapMode !== 'off') {
         return {
           ...state,
           swapMode: 'off',
           selectedSwapLane: null,
           lanes: state.lanes.map((l) =>
-            l.status === 'selected' ? { ...l, status: 'default' } : l,
+            l.status === 'selected' ? { ...l, status: 'default' as const } : l,
           ),
         };
       }
+      if (state.swapQuantity <= 0) return state;
       return {
         ...state,
         multiplierSelected: false,
+        bombSelected: false,
+        freezeSelected: false,
+        wildSelected: false,
+        selectedWildValue: null,
         swapMode: 'selectFirst',
         selectedSwapLane: null,
       };
     }
+
+    case 'TOGGLE_BOMB': {
+      if (!state.config.powerUpsEnabled) return state;
+      if (state.gameStatus !== 'playing') return state;
+      if (state.bombQuantity <= 0 && !state.bombSelected) return state;
+      return {
+        ...state,
+        bombSelected: !state.bombSelected,
+        multiplierSelected: false,
+        swapMode: 'off',
+        selectedSwapLane: null,
+        freezeSelected: false,
+        wildSelected: false,
+        selectedWildValue: null,
+        lanes: state.lanes.map((l) =>
+          l.status === 'selected' ? { ...l, status: 'default' as const } : l,
+        ),
+      };
+    }
+
+    case 'TOGGLE_FREEZE': {
+      if (!state.config.powerUpsEnabled) return state;
+      if (state.gameStatus !== 'playing') return state;
+      if (state.freezeQuantity <= 0 && !state.freezeSelected) return state;
+      return {
+        ...state,
+        freezeSelected: !state.freezeSelected,
+        multiplierSelected: false,
+        swapMode: 'off',
+        selectedSwapLane: null,
+        bombSelected: false,
+        wildSelected: false,
+        selectedWildValue: null,
+        lanes: state.lanes.map((l) =>
+          l.status === 'selected' ? { ...l, status: 'default' as const } : l,
+        ),
+      };
+    }
+
+    case 'TOGGLE_SHIELD': {
+      if (!state.config.powerUpsEnabled) return state;
+      if (state.gameStatus !== 'playing') return state;
+      if (state.shieldQuantity <= 0 && !state.shieldArmed) return state;
+      // Shield does not clear other placement power-ups
+      return { ...state, shieldArmed: !state.shieldArmed };
+    }
+
+    case 'OPEN_WILD': {
+      if (!state.config.powerUpsEnabled) return state;
+      if (state.gameStatus !== 'playing') return state;
+      if (state.wildQuantity <= 0 && !state.wildSelected) return state;
+      return {
+        ...state,
+        wildSelected: true,
+        selectedWildValue: null,
+        multiplierSelected: false,
+        swapMode: 'off',
+        selectedSwapLane: null,
+        bombSelected: false,
+        freezeSelected: false,
+        lanes: state.lanes.map((l) =>
+          l.status === 'selected' ? { ...l, status: 'default' as const } : l,
+        ),
+      };
+    }
+
+    case 'SET_WILD_VALUE': {
+      if (!state.wildSelected) return state;
+      const clamped = Math.max(1, Math.min(10, Math.floor(action.value)));
+      return { ...state, selectedWildValue: clamped };
+    }
+
+    case 'CANCEL_WILD': {
+      return { ...state, wildSelected: false, selectedWildValue: null };
+    }
+
     case 'SELECT_SWAP_LANE': {
       if (!state.config.powerUpsEnabled) return state;
       if (state.gameStatus !== 'playing') return state;
@@ -200,8 +334,8 @@ function reducer(state: State, action: Action): State {
           swapMode: 'selectSecond',
           lanes: state.lanes.map((l, i) =>
             i === action.laneIndex
-              ? { ...l, status: 'selected' }
-              : { ...l, status: l.status === 'selected' ? 'default' : l.status },
+              ? { ...l, status: 'selected' as const }
+              : { ...l, status: l.status === 'selected' ? ('default' as const) : l.status },
           ),
         };
       }
@@ -215,7 +349,7 @@ function reducer(state: State, action: Action): State {
           swapMode: 'off',
           selectedSwapLane: null,
           lanes: state.lanes.map((l) =>
-            l.status === 'selected' ? { ...l, status: 'default' } : l,
+            l.status === 'selected' ? { ...l, status: 'default' as const } : l,
           ),
         };
       }
@@ -233,21 +367,49 @@ function reducer(state: State, action: Action): State {
         selectedSwapLane: null,
       };
     }
+
     case 'CLEAR_SWAP_HIGHLIGHT': {
       return {
         ...state,
         lanes: state.lanes.map((l) =>
-          l.status === 'selected' ? { ...l, status: 'default' } : l,
+          l.status === 'selected' ? { ...l, status: 'default' as const } : l,
         ),
       };
     }
+
+    case 'APPLY_BOMB': {
+      if (!state.config.powerUpsEnabled || state.bombQuantity <= 0) return state;
+      const bombed = clearLaneWithBomb(state.lanes, action.laneIndex);
+      if (!bombed.ok) return state;
+      return {
+        ...state,
+        lanes: bombed.lanes,
+        bombQuantity: Math.max(0, state.bombQuantity - 1),
+        bombSelected: false,
+        bombPulseLane: action.laneIndex,
+        gameStatus: 'resolving',
+      };
+    }
+
+    case 'CLEAR_BOMB_RESOLVE': {
+      return {
+        ...state,
+        bombPulseLane: null,
+        gameStatus: state.gameStatus === 'resolving' ? 'playing' : state.gameStatus,
+      };
+    }
+
     case 'BEGIN_PLACE': {
       if (state.gameStatus !== 'playing') return state;
       if (state.swapMode !== 'off') return state;
       const lane = state.lanes[action.laneIndex];
       if (!lane || lane.status === 'frozen') return state;
-      const effective =
-        state.currentTile.value * (state.multiplierSelected ? 2 : 1);
+      const wildValue =
+        state.wildSelected && state.selectedWildValue != null
+          ? state.selectedWildValue
+          : null;
+      const usingMultiplier = wildValue == null && state.multiplierSelected;
+      const effective = effectiveTileValue(state.currentTile, usingMultiplier, wildValue);
       return {
         ...state,
         gameStatus: 'resolving',
@@ -257,10 +419,11 @@ function reducer(state: State, action: Action): State {
           effectiveValue: effective,
         },
         lanes: state.lanes.map((l, i) =>
-          i === action.laneIndex ? { ...l, status: 'receiving' } : l,
+          i === action.laneIndex ? { ...l, status: 'receiving' as const } : l,
         ),
       };
     }
+
     case 'APPLY_PLACE': {
       const r = action.result;
       return {
@@ -275,6 +438,19 @@ function reducer(state: State, action: Action): State {
         runStats: r.runStats,
         multiplierQuantity: r.multiplierQuantity,
         multiplierSelected: false,
+        freezeQuantity: r.consumedFreeze
+          ? Math.max(0, state.freezeQuantity - 1)
+          : state.freezeQuantity,
+        freezeSelected: false,
+        wildQuantity: r.consumedWild
+          ? Math.max(0, state.wildQuantity - 1)
+          : state.wildQuantity,
+        wildSelected: false,
+        selectedWildValue: null,
+        shieldQuantity: r.consumedShield
+          ? Math.max(0, state.shieldQuantity - 1)
+          : state.shieldQuantity,
+        shieldArmed: r.consumedShield ? false : state.shieldArmed,
         travel: null,
         scorePulseKey:
           r.pointsAwarded > 0 ? state.scorePulseKey + 1 : state.scorePulseKey,
@@ -285,6 +461,7 @@ function reducer(state: State, action: Action): State {
         gameStatus: r.gameOver ? 'resolving' : 'playing',
       };
     }
+
     case 'CLEAR_LANE_FEEDBACK': {
       return {
         ...state,
@@ -292,27 +469,38 @@ function reducer(state: State, action: Action): State {
           i === action.laneIndex
             ? {
                 ...l,
-                status: 'default',
+                status: 'default' as const,
                 total: action.resetTotal ? 0 : l.total,
               }
             : l,
         ),
       };
     }
+
     case 'ADD_POPUP': {
       return {
         ...state,
         floatingPopups: [...state.floatingPopups, action.popup],
       };
     }
+
     case 'REMOVE_POPUP': {
       return {
         ...state,
         floatingPopups: state.floatingPopups.filter((p) => p.id !== action.id),
       };
     }
+
     case 'SET_GAME_OVER':
       return { ...state, gameStatus: 'gameOver' };
+
+    case 'REVIVE_STRIKE':
+      return {
+        ...state,
+        strikesRemaining: Math.max(1, state.strikesRemaining + 1),
+        gameStatus: 'playing',
+      };
+
     default:
       return state;
   }
@@ -324,12 +512,20 @@ type Options = {
   configuration: RunConfiguration;
   onGameOver: (payload: GameOverPayload) => void;
   onDailyComplete: (params: DailyResultsParams) => void;
+  /** Classic strikes game-over only. Return true to defer navigation (revive UI). */
+  onReviveOpportunity?: (ctx: {
+    stats: RunStats;
+    proceed: () => void;
+  }) => boolean;
+  runId?: string;
 };
 
 export function useNumberRushGame({
   configuration,
   onGameOver,
   onDailyComplete,
+  onReviveOpportunity,
+  runId: runIdProp,
 }: Options) {
   const configRef = useRef(configuration);
   configRef.current = configuration;
@@ -340,9 +536,14 @@ export function useNumberRushGame({
   onGameOverRef.current = onGameOver;
   const onDailyCompleteRef = useRef(onDailyComplete);
   onDailyCompleteRef.current = onDailyComplete;
+  const onReviveOpportunityRef = useRef(onReviveOpportunity);
+  onReviveOpportunityRef.current = onReviveOpportunity;
+  const runIdRef = useRef(
+    runIdProp ?? `run-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+  );
   const placingRef = useRef(false);
   const finishingRef = useRef(false);
-  const inventoryRef = useRef<{ multiplier: number; swap: number } | null>(null);
+  const inventoryRef = useRef<Partial<RunPowerInventory> | null>(null);
   const usageRef = useRef({ multipliersUsed: 0, swapsUsed: 0 });
 
   const clearTimers = useCallback(() => {
@@ -357,15 +558,9 @@ export function useNumberRushGame({
       usageRef.current = { multipliersUsed: 0, swapsUsed: 0 };
       if (config.powerUpsEnabled) {
         const inv = await getPlayerInventory();
-        inventoryRef.current = {
-          multiplier: inv.multiplier,
-          swap: inv.swap,
-        };
-        dispatch({
-          type: 'RESTART',
-          config,
-          inventory: inventoryRef.current,
-        });
+        const runInv = toRunPowerInventory(inv);
+        inventoryRef.current = runInv;
+        dispatch({ type: 'RESTART', config, inventory: runInv });
       } else {
         inventoryRef.current = null;
         dispatch({ type: 'RESTART', config });
@@ -425,6 +620,13 @@ export function useNumberRushGame({
       swapsUsed: usageRef.current.swapsUsed,
     });
   }, []);
+
+  const proceedClassicGameOver = useCallback(
+    (stats: RunStats) => {
+      void finishClassic(stats);
+    },
+    [finishClassic],
+  );
 
   const finishDaily = useCallback(
     async (stats: RunStats, reason: RunCompletionReason, cfg: RunConfiguration) => {
@@ -513,6 +715,24 @@ export function useNumberRushGame({
         await finishDaily(stats, reason, cfg);
         return;
       }
+      if (
+        cfg.mode === 'classic' &&
+        reason === 'strikes' &&
+        onReviveOpportunityRef.current
+      ) {
+        const deferred = onReviveOpportunityRef.current({
+          stats,
+          proceed: () => {
+            void finishClassic(stats);
+          },
+        });
+        if (deferred) {
+          finishingRef.current = false;
+          return;
+        }
+      }
+      // Ranked uses Classic local reward path for now; server validation
+      // is queued separately when cloud features are configured.
       await finishClassic(stats);
     },
     [finishClassic, finishDaily],
@@ -522,6 +742,23 @@ export function useNumberRushGame({
     (laneIndex: number) => {
       if (placingRef.current || finishingRef.current) return;
       if (state.gameStatus !== 'playing') return;
+
+      // --- Bomb flow: consume bomb on a non-empty lane ---
+      if (state.bombSelected) {
+        const lane = state.lanes[laneIndex];
+        if (!lane || lane.total <= 0) return;
+        placingRef.current = true;
+        dispatch({ type: 'APPLY_BOMB', laneIndex });
+        void updateInventoryItem('bomb', -1);
+        addPopup('BOMB!', laneIndex, 'bomb');
+        schedule(() => {
+          dispatch({ type: 'CLEAR_BOMB_RESOLVE' });
+          placingRef.current = false;
+        }, BOMB_RESOLVE_DURATION);
+        return;
+      }
+
+      // --- Swap flow ---
       if (state.swapMode !== 'off') {
         const modeBefore = state.swapMode;
         const willConsumeSwap =
@@ -539,11 +776,21 @@ export function useNumberRushGame({
         }
         return;
       }
+
+      // --- Normal / Wild / Freeze / Shield placement ---
       const lane = state.lanes[laneIndex];
       if (!lane || lane.status === 'frozen') return;
 
+      // Wild selected but value not yet chosen — wait for picker
+      if (state.wildSelected && state.selectedWildValue === null) return;
+
       placingRef.current = true;
       dispatch({ type: 'BEGIN_PLACE', laneIndex });
+
+      const wildValue =
+        state.wildSelected && state.selectedWildValue != null
+          ? state.selectedWildValue
+          : null;
 
       const snapshot = {
         lanes: state.lanes,
@@ -556,6 +803,9 @@ export function useNumberRushGame({
         multiplierSelected: state.multiplierSelected,
         multiplierQuantity: state.multiplierQuantity,
         maximumTiles: state.config.maximumTiles,
+        wildValue,
+        freezeActive: state.freezeSelected,
+        shieldArmed: state.shieldArmed,
       };
 
       schedule(() => {
@@ -571,8 +821,19 @@ export function useNumberRushGame({
           usageRef.current.multipliersUsed += 1;
           void updateInventoryItem('multiplier', -1);
         }
+        if (result.consumedFreeze) {
+          void updateInventoryItem('freeze', -1);
+        }
+        if (result.consumedWild) {
+          void updateInventoryItem('wild', -1);
+        }
+        if (result.consumedShield) {
+          void updateInventoryItem('shield', -1);
+        }
 
-        if (result.outcome === 'perfect') {
+        if (result.shieldBlocked) {
+          addPopup('SHIELDED!', laneIndex, 'shielded');
+        } else if (result.outcome === 'perfect') {
           addPopup(`PERFECT +${result.pointsAwarded}`, laneIndex, 'perfect');
         } else if (result.outcome === 'bust') {
           addPopup('BUST!', laneIndex, 'bust');
@@ -608,6 +869,7 @@ export function useNumberRushGame({
     [
       state.gameStatus,
       state.swapMode,
+      state.selectedSwapLane,
       state.lanes,
       state.currentTile,
       state.nextTile,
@@ -618,6 +880,11 @@ export function useNumberRushGame({
       state.multiplierSelected,
       state.multiplierQuantity,
       state.config.maximumTiles,
+      state.bombSelected,
+      state.freezeSelected,
+      state.shieldArmed,
+      state.wildSelected,
+      state.selectedWildValue,
       schedule,
       addPopup,
       finishRun,
@@ -673,27 +940,57 @@ export function useNumberRushGame({
     dispatch({ type: 'TOGGLE_SWAP' });
   }, []);
 
+  const toggleBomb = useCallback(() => {
+    dispatch({ type: 'TOGGLE_BOMB' });
+  }, []);
+
+  const toggleFreeze = useCallback(() => {
+    dispatch({ type: 'TOGGLE_FREEZE' });
+  }, []);
+
+  const toggleShield = useCallback(() => {
+    dispatch({ type: 'TOGGLE_SHIELD' });
+  }, []);
+
+  const openWildPicker = useCallback(() => {
+    dispatch({ type: 'OPEN_WILD' });
+  }, []);
+
+  const confirmWildValue = useCallback((value: number) => {
+    dispatch({ type: 'SET_WILD_VALUE', value });
+  }, []);
+
+  const cancelWild = useCallback(() => {
+    dispatch({ type: 'CANCEL_WILD' });
+  }, []);
+
   const tilesRemaining =
     state.config.maximumTiles == null
       ? null
       : Math.max(0, state.config.maximumTiles - state.runStats.tilesPlaced);
 
   const dateKey =
-    state.config.mode === 'daily'
-      ? getUtcDateKey()
-      : null;
+    state.config.mode === 'daily' ? getUtcDateKey() : null;
 
   const instructionText = (() => {
-    if (!state.config.powerUpsEnabled) {
-      return 'TAP A LANE TO PLACE THE TILE';
-    }
+    if (!state.config.powerUpsEnabled) return 'TAP A LANE TO PLACE THE TILE';
     if (state.swapMode === 'selectFirst') return 'SELECT FIRST LANE';
     if (state.swapMode === 'selectSecond') return 'SELECT SECOND LANE';
     if (state.multiplierSelected) return 'X2 ACTIVE — TAP A LANE';
+    if (state.bombSelected) return 'SELECT A LANE TO CLEAR';
+    if (state.freezeSelected) return 'FREEZE ACTIVE — TAP A LANE';
+    if (state.wildSelected) {
+      if (state.selectedWildValue != null) {
+        return `WILD ${state.selectedWildValue} — TAP A LANE`;
+      }
+      return 'PICK A WILD VALUE';
+    }
+    if (state.shieldArmed) return 'SHIELD ARMED — TAP A LANE';
     return 'TAP A LANE TO PLACE THE TILE';
   })();
 
   return {
+    // Board state
     lanes: state.lanes,
     score: state.score,
     comboStreak: state.comboStreak,
@@ -703,11 +1000,24 @@ export function useNumberRushGame({
     nextTile: state.nextTile,
     gameStatus: state.gameStatus,
     runStats: state.runStats,
+    // Power-up quantities
     multiplierQuantity: state.multiplierQuantity,
-    multiplierSelected: state.multiplierSelected,
     swapQuantity: state.swapQuantity,
+    bombQuantity: state.bombQuantity,
+    freezeQuantity: state.freezeQuantity,
+    shieldQuantity: state.shieldQuantity,
+    wildQuantity: state.wildQuantity,
+    // Power-up selection states
+    multiplierSelected: state.multiplierSelected,
     swapMode: state.swapMode,
     selectedSwapLane: state.selectedSwapLane,
+    bombSelected: state.bombSelected,
+    freezeSelected: state.freezeSelected,
+    shieldArmed: state.shieldArmed,
+    wildSelected: state.wildSelected,
+    selectedWildValue: state.selectedWildValue,
+    bombPulseLane: state.bombPulseLane,
+    // UI state
     floatingPopups: state.floatingPopups,
     travel: state.travel,
     scorePulseKey: state.scorePulseKey,
@@ -720,15 +1030,30 @@ export function useNumberRushGame({
     dateKey,
     dailySeed: dateKey ? getDailySeed(dateKey) : null,
     instructionText,
+    // Actions
     placeTile,
     toggleMultiplier,
     toggleSwap,
+    toggleBomb,
+    toggleFreeze,
+    toggleShield,
+    openWildPicker,
+    confirmWildValue,
+    cancelWild,
     selectSwapLane,
     pauseGame,
     resumeGame,
     restartGame,
     quitGame,
     forfeitOfficialDaily,
+    reviveFromRewardedAd: () => {
+      dispatch({ type: 'REVIVE_STRIKE' });
+      finishingRef.current = false;
+    },
+    runId: runIdRef.current,
+    proceedClassicGameOver: (stats?: RunStats) => {
+      proceedClassicGameOver(stats ?? state.runStats);
+    },
   };
 }
 

@@ -17,6 +17,8 @@ import type { BottomNavRoute, RootStackParamList } from '../navigation/navigatio
 import { hasCompletedOfficialDailyAttempt } from '../storage/dailyStorage';
 import { countClaimableMissions } from '../storage/missionStorage';
 import { getPlayerProfile } from '../storage/playerStorage';
+import { useOptionalAudio } from '../audio/AudioProvider';
+import { useReducedMotionPreference } from '../settings/SettingsProvider';
 import { useOptionalGameTheme } from '../themes/GameThemeProvider';
 import { colors, fontFamilies, spacing, withAlpha } from '../theme';
 
@@ -25,6 +27,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'MainMenu'>;
 export function MainMenuScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const themeCtx = useOptionalGameTheme();
+  const audio = useOptionalAudio();
+  const reducedMotion = useReducedMotionPreference();
   const refreshThemes = themeCtx?.refreshThemes;
   const [dailyBadge, setDailyBadge] = useState<'NEW' | 'DONE' | null>(null);
   const [coins, setCoins] = useState(500);
@@ -49,7 +53,8 @@ export function MainMenuScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       void refresh();
-    }, [refresh]),
+      void audio?.playMusic('menu');
+    }, [refresh, audio]),
   );
 
   const onBottomNav = (route: BottomNavRoute) => {
@@ -61,8 +66,15 @@ export function MainMenuScreen({ navigation }: Props) {
   const accent = themeCtx?.themeColors.neonPink ?? colors.neonPink;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: bg }]}>
-      <View style={[styles.decorLayer, { pointerEvents: 'none' }]}>
+    <View
+      style={[styles.root, { paddingTop: insets.top, backgroundColor: bg }]}
+      testID="main-menu"
+    >
+      <View
+        style={[styles.decorLayer, { pointerEvents: 'none' }]}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+      >
         <GridBackground opacity={0.05} />
         <View
           style={[
@@ -70,7 +82,7 @@ export function MainMenuScreen({ navigation }: Props) {
             { backgroundColor: withAlpha(themeCtx?.themeColors.purple ?? colors.purple, 0.1) },
           ]}
         />
-        <AnimatedNeonBackground intensity="menu" />
+        <AnimatedNeonBackground intensity="menu" reducedMotion={reducedMotion} />
         <PerspectiveGrid />
       </View>
 
@@ -85,6 +97,7 @@ export function MainMenuScreen({ navigation }: Props) {
           </View>
         </View>
         <NeonIconButton
+          testID="menu-settings"
           accessibilityLabel="Settings"
           onPress={() => navigation.navigate('Settings')}
           color={colors.muted}
@@ -100,6 +113,7 @@ export function MainMenuScreen({ navigation }: Props) {
 
         <View style={[styles.buttons, { pointerEvents: 'box-none' }]}>
           <NeonButton
+            testID="menu-play"
             label="PLAY"
             color={accent}
             size="large"
@@ -110,6 +124,7 @@ export function MainMenuScreen({ navigation }: Props) {
           />
           <View style={styles.buttonWrap}>
             <NeonButton
+              testID="menu-daily"
               label="DAILY TOURNAMENT"
               color={colors.orange}
               size="large"
@@ -129,6 +144,7 @@ export function MainMenuScreen({ navigation }: Props) {
             ) : null}
           </View>
           <NeonButton
+            testID="menu-ranked"
             label="RANKED"
             color={colors.electricBlue}
             size="large"
@@ -136,6 +152,7 @@ export function MainMenuScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Ranked')}
           />
           <NeonButton
+            testID="menu-shop"
             label="SHOP"
             color={colors.purple}
             size="large"

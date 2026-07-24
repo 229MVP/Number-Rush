@@ -38,6 +38,8 @@ import {
 } from '../storage/playerStorage';
 import { GAME_THEMES } from '../themes/gameThemes';
 import { useGameTheme } from '../themes/GameThemeProvider';
+import { useAuth } from '../hooks/useAuth';
+import { useCloudSync } from '../hooks/useCloudSync';
 import { colors, fontFamilies, neonGlow, radii, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
@@ -52,6 +54,8 @@ type MissionPreview = {
 export function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { selectTheme, refreshThemes } = useGameTheme();
+  const { isAuthenticated, isGuest } = useAuth();
+  const { status: syncStatus, enabled: syncEnabled } = useCloudSync();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [stats, setStats] = useState<LifetimeStats | null>(null);
   const [missions, setMissions] = useState<MissionPreview[]>([]);
@@ -169,7 +173,7 @@ export function ProfileScreen({ navigation }: Props) {
   ];
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: insets.top }]} testID="screen-profile">
       <View style={[styles.decor, { pointerEvents: 'none' }]}>
         <GridBackground opacity={0.04} />
         <AnimatedNeonBackground intensity="menu" />
@@ -179,7 +183,35 @@ export function ProfileScreen({ navigation }: Props) {
         <Text style={[styles.heading, neonGlow(colors.electricBlue, 4)]}>
           PROFILE
         </Text>
-        <CurrencyChip coins={profile.coins} gems={profile.gems} />
+        <View style={styles.headerRight}>
+          <View
+            style={[styles.syncPill, { pointerEvents: 'none' }]}
+            testID="profile-sync-indicator"
+          >
+            <View
+              style={[
+                styles.syncDot,
+                {
+                  backgroundColor: isAuthenticated
+                    ? syncStatus === 'error'
+                      ? colors.red
+                      : colors.green
+                    : colors.muted,
+                },
+              ]}
+            />
+            <Text style={styles.syncText}>
+              {isAuthenticated
+                ? syncEnabled
+                  ? 'CLOUD'
+                  : 'LOCAL'
+                : isGuest
+                  ? 'GUEST'
+                  : 'LOCAL'}
+            </Text>
+          </View>
+          <CurrencyChip coins={profile.coins} gems={profile.gems} />
+        </View>
       </View>
 
       <ScrollView
@@ -389,6 +421,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  syncPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: withAlpha(colors.muted, 0.25),
+    backgroundColor: withAlpha(colors.card, 0.6),
+  },
+  syncDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  syncText: {
+    fontFamily: fontFamilies.rajdhaniBold,
+    fontSize: 9,
+    letterSpacing: 1,
+    color: colors.muted,
   },
   heading: {
     fontFamily: fontFamilies.orbitronBold,

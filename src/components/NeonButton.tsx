@@ -24,6 +24,7 @@ type Props = {
   icon?: React.ReactNode;
   style?: ViewStyle;
   disabled?: boolean;
+  testID?: string;
 };
 
 const SIZE_MAP = {
@@ -41,6 +42,7 @@ export function NeonButton({
   icon,
   style,
   disabled = false,
+  testID,
 }: Props) {
   const scale = useRef(new Animated.Value(1)).current;
   const cfg = SIZE_MAP[size];
@@ -55,6 +57,7 @@ export function NeonButton({
 
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       disabled={disabled}
       hitSlop={8}

@@ -44,6 +44,7 @@ export function PauseModal({
               PAUSED
             </Text>
             <NeonButton
+              testID="pause-resume"
               label="RESUME"
               color={colors.neonPink}
               size="large"
@@ -81,6 +82,7 @@ export function PauseModal({
               />
             ) : (
               <NeonButton
+                testID="pause-quit"
                 label={isDailyPractice ? 'QUIT PRACTICE' : 'QUIT TO MENU'}
                 color={colors.muted}
                 icon={<Home size={15} color={colors.white} />}

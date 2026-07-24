@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { HelpCircle, Snowflake } from 'lucide-react-native';
 import type { NumberTileData } from '../../game/gameTypes';
 import { colors, fontFamilies, neonGlow, radii, withAlpha } from '../../theme';
 
@@ -9,27 +10,54 @@ type Props = {
   tile: NumberTileData;
   variant?: Variant;
   multiplierSelected?: boolean;
+  freezeSelected?: boolean;
+  wildValue?: number | null;
   showEffective?: boolean;
-  /** Attached to the visual card surface for tutorial measurement. */
   measureRef?: React.Ref<View>;
   onCardLayout?: () => void;
+  testID?: string;
 };
 
-export function NumberTile({
+function NumberTileComponent({
   tile,
   variant = 'current',
   multiplierSelected = false,
+  freezeSelected = false,
+  wildValue = null,
   showEffective = false,
   measureRef,
   onCardLayout,
+  testID,
 }: Props) {
   const isCurrent = variant === 'current' || variant === 'travel';
-  const effective = multiplierSelected ? tile.value * 2 : tile.value;
+  const displayValue = wildValue != null ? wildValue : tile.value;
+  const effective =
+    wildValue != null
+      ? wildValue
+      : multiplierSelected
+        ? tile.value * 2
+        : tile.value;
+
+  const a11yLabel =
+    variant === 'next'
+      ? `Next tile, value ${tile.value}`
+      : wildValue != null
+        ? `Current tile, wild value ${wildValue}`
+        : freezeSelected
+          ? `Current tile, value ${tile.value}, frozen`
+          : multiplierSelected
+            ? `Current tile, value ${tile.value}, multiplier active, effective ${effective}`
+            : `Current tile, value ${tile.value}`;
 
   return (
-    <View style={styles.col}>
+    <View
+      testID={testID}
+      style={styles.col}
+      accessible
+      accessibilityLabel={a11yLabel}
+    >
       {variant !== 'travel' ? (
-        <Text style={styles.label}>
+        <Text style={styles.label} importantForAccessibility="no">
           {variant === 'current' ? 'CURRENT TILE' : 'NEXT'}
         </Text>
       ) : null}
@@ -40,14 +68,30 @@ export function NumberTile({
         style={[
           isCurrent ? styles.current : styles.next,
           isCurrent
-            ? neonGlow(colors.purple, 16)
+            ? neonGlow(
+                freezeSelected
+                  ? colors.cyan
+                  : wildValue != null
+                    ? colors.purple
+                    : colors.purple,
+                16,
+              )
             : neonGlow(colors.electricBlue, 8),
+          freezeSelected && isCurrent
+            ? { borderColor: colors.cyan, backgroundColor: withAlpha(colors.cyan, 0.22) }
+            : null,
         ]}
       >
         {isCurrent ? (
           <>
-            <View style={[styles.cornerTL, { borderColor: colors.neonPink, pointerEvents: 'none' }]} />
-            <View style={[styles.cornerBR, { borderColor: colors.neonPink, pointerEvents: 'none' }]} />
+            <View
+              style={[styles.cornerTL, { borderColor: colors.neonPink }]}
+              importantForAccessibility="no"
+            />
+            <View
+              style={[styles.cornerBR, { borderColor: colors.neonPink }]}
+              importantForAccessibility="no"
+            />
           </>
         ) : null}
         <Text
@@ -57,21 +101,35 @@ export function NumberTile({
               ? neonGlow(colors.purple, 10)
               : neonGlow(colors.electricBlue, 5),
           ]}
+          importantForAccessibility="no"
         >
-          {tile.value}
+          {displayValue}
         </Text>
-        {isCurrent && multiplierSelected ? (
+        {isCurrent && multiplierSelected && wildValue == null ? (
           <View style={[styles.badge, neonGlow(colors.orange, 6)]}>
             <Text style={styles.badgeText}>x2</Text>
           </View>
         ) : null}
+        {isCurrent && freezeSelected ? (
+          <View style={[styles.frostBadge, neonGlow(colors.cyan, 6)]}>
+            <Snowflake size={10} color={colors.cyan} />
+            <Text style={styles.frostText}>FROZEN</Text>
+          </View>
+        ) : null}
+        {isCurrent && wildValue != null ? (
+          <View style={[styles.wildBadge, neonGlow(colors.purple, 6)]}>
+            <HelpCircle size={10} color={colors.white} />
+          </View>
+        ) : null}
       </View>
-      {isCurrent && showEffective && multiplierSelected ? (
+      {isCurrent && showEffective && (multiplierSelected || wildValue != null) ? (
         <Text style={styles.effective}>EFFECTIVE: {effective}</Text>
       ) : null}
     </View>
   );
 }
+
+export const NumberTile = memo(NumberTileComponent);
 
 const styles = StyleSheet.create({
   col: {
@@ -147,6 +205,32 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.orbitronBold,
     fontSize: 9,
     color: colors.white,
+  },
+  frostBadge: {
+    position: 'absolute',
+    bottom: 3,
+    left: 3,
+    right: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    backgroundColor: withAlpha(colors.cyan, 0.85),
+    borderRadius: 5,
+    paddingVertical: 1,
+  },
+  frostText: {
+    fontFamily: fontFamilies.orbitronBold,
+    fontSize: 7,
+    color: colors.background,
+  },
+  wildBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    backgroundColor: withAlpha(colors.purple, 0.95),
+    borderRadius: 8,
+    padding: 2,
   },
   effective: {
     fontFamily: fontFamilies.rajdhaniBold,

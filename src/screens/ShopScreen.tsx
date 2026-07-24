@@ -24,17 +24,29 @@ import {
   getPlayerProfile,
 } from '../storage/playerStorage';
 import { GAME_THEMES, type GameTheme } from '../themes/gameThemes';
+import { useOptionalAudio } from '../audio/AudioProvider';
+import { useOptionalHaptics } from '../haptics/HapticsProvider';
+import { PurchaseSuccessModal } from '../components/monetization/PurchaseSuccessModal';
+import {
+  removeAdsProductEnabled,
+  starterBundleEnabled,
+  subscriptionsEnabled,
+} from '../config/featureFlags';
+import { usePurchases } from '../hooks/usePurchases';
+import type { PurchaseProductId } from '../monetization/monetizationTypes';
+import { CATALOG_PRODUCTS, getCatalogProduct } from '../purchases/purchaseCatalog';
+import type { PurchaseOffering, PurchasePackageRef } from '../purchases/purchaseTypes';
 import { useGameTheme } from '../themes/GameThemeProvider';
 import { colors, fontFamilies, neonGlow, radii, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Shop'>;
-type Tab = 'powerup' | 'theme' | 'coins' | 'gems';
+type Tab = 'powerup' | 'theme' | 'coins' | 'gems' | 'premium';
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'powerup', label: 'POWER-UPS' },
   { id: 'theme', label: 'THEMES' },
-  { id: 'coins', label: 'COINS' },
   { id: 'gems', label: 'GEMS' },
+  { id: 'premium', label: 'PREMIUM' },
 ];
 
 function ownedForItem(item: ShopItem, inv: PlayerInventory): number | null {
@@ -44,14 +56,51 @@ function ownedForItem(item: ShopItem, inv: PlayerInventory): number | null {
   return inv[key];
 }
 
-export function ShopScreen({ navigation }: Props) {
+const GEM_PRODUCT_IDS: PurchaseProductId[] = [
+  'numberrush.gems_80',
+  'numberrush.gems_450',
+  'numberrush.gems_1000',
+  'numberrush.gems_2500',
+];
+
+function unlockRequirement(theme: GameTheme): string {
+  if (theme.unlockType === 'default') return 'Owned';
+  if (theme.unlockType === 'level') return `Level ${theme.unlockValue}`;
+  if (theme.unlockType === 'coins') return `${theme.unlockValue} coins`;
+  if (theme.unlockType === 'gems') return `${theme.unlockValue} gems`;
+  if (theme.unlockType === 'rank') {
+    return `Reach ${String(theme.unlockValue).toUpperCase()} division`;
+  }
+  return 'Locked';
+}
+
+function findPackage(
+  offerings: PurchaseOffering[],
+  productId: PurchaseProductId,
+): PurchasePackageRef | null {
+  for (const offering of offerings) {
+    const match = offering.packages.find((p) => p.productId === productId);
+    if (match) return match;
+  }
+  return null;
+}
+
+export function ShopScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const audio = useOptionalAudio();
+  const haptics = useOptionalHaptics();
   const { selectTheme, refreshThemes } = useGameTheme();
-  const [tab, setTab] = useState<Tab>('powerup');
+  const purchases = usePurchases();
+  const [tab, setTab] = useState<Tab>(
+    route.params?.initialTab === 'coins' ? 'gems' : (route.params?.initialTab ?? 'powerup'),
+  );
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [inventory, setInventory] = useState<PlayerInventory | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [successProductId, setSuccessProductId] = useState<PurchaseProductId | null>(
+    null,
+  );
 
   const refresh = useCallback(async () => {
     const [p, inv] = await Promise.all([
@@ -66,7 +115,8 @@ export function ShopScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       void refresh();
-    }, [refresh]),
+      void purchases.refreshOfferings();
+    }, [refresh, purchases]),
   );
 
   const buy = (item: ShopItem) => {
@@ -90,6 +140,8 @@ export function ShopScreen({ navigation }: Props) {
                   setProfile(result.profile);
                   setInventory(result.inventory);
                   setFeedback(`Purchased ${item.name}`);
+                  audio?.playSound('purchase');
+                  haptics?.success();
                   await refreshThemes();
                 }
               } finally {
@@ -102,16 +154,66 @@ export function ShopScreen({ navigation }: Props) {
     );
   };
 
-  const unlockRequirement = (theme: GameTheme): string => {
-    if (theme.unlockType === 'default') return 'Owned';
-    if (theme.unlockType === 'level') return `Level ${theme.unlockValue}`;
-    if (theme.unlockType === 'coins') return `${theme.unlockValue} coins`;
-    if (theme.unlockType === 'gems') return `${theme.unlockValue} gems`;
-    if (theme.unlockType === 'rank') {
-      return `Reach ${String(theme.unlockValue).toUpperCase()} division`;
-    }
-    return 'Locked';
+  const buyIap = (productId: PurchaseProductId, pkg: PurchasePackageRef | null) => {
+    if (busyId || !pkg) return;
+    const catalog = getCatalogProduct(productId);
+    const priceLabel = purchases.monetizationTestMode
+      ? 'Sandbox (test mode)'
+      : 'the App Store / Play Store';
+    Alert.alert(
+      'Confirm purchase',
+      `Buy ${catalog?.title ?? productId} via ${priceLabel}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Buy',
+          onPress: () => {
+            void (async () => {
+              setBusyId(productId);
+              setFeedback(null);
+              try {
+                const result = await purchases.purchasePackage(pkg);
+                if (result.ok) {
+                  setSuccessProductId(result.productId);
+                  audio?.playSound('purchase');
+                  haptics?.success();
+                  await refresh();
+                } else if (!result.cancelled) {
+                  setFeedback(result.error);
+                }
+              } finally {
+                setBusyId(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
   };
+
+  const restoreIap = () => {
+    void (async () => {
+      setFeedback(null);
+      const result = await purchases.restorePurchases();
+      if (result.ok) {
+        setFeedback('Purchases restored');
+        haptics?.success();
+      } else {
+        setFeedback(result.error);
+      }
+    })();
+  };
+
+  const premiumProductIds: PurchaseProductId[] = [
+    ...(removeAdsProductEnabled ? (['numberrush.remove_ads'] as const) : []),
+    ...(starterBundleEnabled ? (['numberrush.starter_bundle'] as const) : []),
+    ...(subscriptionsEnabled
+      ? (['numberrush.club.monthly', 'numberrush.club.annual'] as const)
+      : []),
+  ];
+
+  const storeReady =
+    purchases.purchasesAvailable && purchases.purchaseState === 'ready';
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -271,23 +373,93 @@ export function ShopScreen({ navigation }: Props) {
             })
           : null}
 
-        {(tab === 'coins' || tab === 'gems') && (
-          <View style={styles.comingCard}>
-            <Text style={styles.comingTitle}>
-              REAL-MONEY PURCHASES COMING LATER
-            </Text>
-            <Text style={styles.desc}>
-              Coin and gem packs are not available in this build. Earn currency
-              through gameplay, missions, and level rewards.
-            </Text>
+        {(tab === 'gems' || tab === 'premium') && (
+          <>
+            {!storeReady ? (
+              <View style={styles.comingCard}>
+                <Text style={styles.comingTitle}>STORE UNAVAILABLE</Text>
+                <Text style={styles.desc}>
+                  In-app purchases are not available on this device right now.
+                  Browse packs below for what is offered when the store connects.
+                </Text>
+              </View>
+            ) : purchases.monetizationTestMode ? (
+              <Text style={styles.testMode}>
+                TEST MODE — prices shown as Sandbox; fulfillment is local only.
+              </Text>
+            ) : null}
+
+            {(tab === 'gems' ? GEM_PRODUCT_IDS : premiumProductIds).map(
+              (productId) => {
+                const catalog =
+                  getCatalogProduct(productId) ??
+                  CATALOG_PRODUCTS.find((p) => p.id === productId);
+                if (!catalog) return null;
+                const pkg = findPackage(purchases.offerings, productId);
+                const ownedPremium =
+                  productId === 'numberrush.remove_ads' &&
+                  purchases.entitlements.removeAds;
+                const clubActive =
+                  (productId === 'numberrush.club.monthly' ||
+                    productId === 'numberrush.club.annual') &&
+                  purchases.entitlements.clubActive;
+                return (
+                  <View
+                    key={productId}
+                    style={[styles.card, neonGlow(colors.purple, 4)]}
+                  >
+                    <View style={styles.cardBody}>
+                      <Text style={[styles.name, { color: colors.purple }]}>
+                        {catalog.title}
+                        {catalog.badge ? ` · ${catalog.badge}` : ''}
+                      </Text>
+                      <Text style={styles.desc}>{catalog.subtitle}</Text>
+                      <Text style={styles.owned}>
+                        {ownedPremium
+                          ? 'OWNED — ADS REMOVED'
+                          : clubActive
+                            ? 'CLUB ACTIVE'
+                            : purchases.monetizationTestMode
+                              ? 'Sandbox price'
+                              : pkg
+                                ? 'Price in store'
+                                : 'Not in current offering'}
+                      </Text>
+                    </View>
+                    <NeonButton
+                      label={ownedPremium || clubActive ? 'OWNED' : 'BUY'}
+                      color={colors.purple}
+                      size="small"
+                      fullWidth={false}
+                      disabled={
+                        busyId === productId ||
+                        !pkg ||
+                        !storeReady ||
+                        ownedPremium ||
+                        clubActive
+                      }
+                      onPress={() => buyIap(productId, pkg)}
+                    />
+                  </View>
+                );
+              },
+            )}
+
             <NeonButton
-              label="VIEW POWER-UPS"
-              color={colors.purple}
-              onPress={() => navigation.navigate('PowerUps')}
+              label="RESTORE PURCHASES"
+              color={colors.electricBlue}
+              size="small"
+              onPress={restoreIap}
             />
-          </View>
+          </>
         )}
       </ScrollView>
+
+      <PurchaseSuccessModal
+        visible={successProductId != null}
+        productId={successProductId}
+        onClose={() => setSuccessProductId(null)}
+      />
     </View>
   );
 }
@@ -406,6 +578,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.purple,
     letterSpacing: 1,
+    textAlign: 'center',
+  },
+  testMode: {
+    fontFamily: fontFamilies.rajdhaniBold,
+    fontSize: 11,
+    color: colors.yellow,
     textAlign: 'center',
   },
 });

@@ -12,12 +12,14 @@ export const SWAP_STARTING_QUANTITY = 3;
 export const MULTIPLIER_FACTOR = 2;
 
 export const DAILY_MAX_TILES = 40;
+export const RANKED_MAX_TILES = 30;
 
 export const TILE_MOVE_DURATION = 250;
 export const NORMAL_FEEDBACK_DURATION = 300;
 export const PERFECT_FEEDBACK_DURATION = 900;
 export const BUST_FEEDBACK_DURATION = 900;
 export const SCORE_POPUP_DURATION = 1100;
+export const BOMB_RESOLVE_DURATION = 550;
 
 /**
  * Optional fixed sequence for manual QA in __DEV__ only.

@@ -29,6 +29,8 @@ import {
   msUntilNextUtcMidnight,
   msUntilNextUtcWeek,
 } from '../utils/missionCountdown';
+import { useOptionalAudio } from '../audio/AudioProvider';
+import { useOptionalHaptics } from '../haptics/HapticsProvider';
 import { colors, fontFamilies, neonGlow, radii, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Missions'>;
@@ -49,6 +51,8 @@ function rewardLabel(def: MissionDefinition): string {
 
 export function MissionsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const audio = useOptionalAudio();
+  const haptics = useOptionalHaptics();
   const [tab, setTab] = useState<Tab>('daily');
   const [daily, setDaily] = useState<MissionPeriodState | null>(null);
   const [weekly, setWeekly] = useState<MissionPeriodState | null>(null);
@@ -94,7 +98,11 @@ export function MissionsScreen({ navigation }: Props) {
     if (claimingId) return;
     setClaimingId(missionId);
     try {
-      await claimMissionReward(tab, missionId);
+      const result = await claimMissionReward(tab, missionId);
+      if (result.ok) {
+        audio?.playSound('missionClaim');
+        haptics?.success();
+      }
       await refresh();
     } finally {
       setClaimingId(null);
@@ -107,7 +115,7 @@ export function MissionsScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: insets.top }]} testID="screen-missions">
       <View style={[styles.decor, { pointerEvents: 'none' }]}>
         <GridBackground opacity={0.04} />
         <AnimatedNeonBackground intensity="menu" />

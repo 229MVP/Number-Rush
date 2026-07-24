@@ -9,6 +9,7 @@ type MultiProps = {
   onPress: () => void;
   disabled?: boolean;
   lockedReason?: string | null;
+  testID?: string;
 };
 
 export function MultiplierPowerUpButton({
@@ -17,13 +18,16 @@ export function MultiplierPowerUpButton({
   onPress,
   disabled = false,
   lockedReason = null,
+  testID,
 }: MultiProps) {
   const locked = lockedReason != null;
   const unavailable = locked || quantity <= 0 || disabled;
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
-      accessibilityLabel="Multiplier"
+      accessibilityLabel={`Double next tile, ${quantity} remaining`}
+      accessibilityState={{ disabled: unavailable && !selected, selected }}
       disabled={unavailable && !selected}
       onPress={onPress}
       style={[
@@ -61,6 +65,7 @@ type SwapProps = {
   onPress: () => void;
   disabled?: boolean;
   lockedReason?: string | null;
+  testID?: string;
 };
 
 export function SwapPowerUpButton({
@@ -69,13 +74,16 @@ export function SwapPowerUpButton({
   onPress,
   disabled = false,
   lockedReason = null,
+  testID,
 }: SwapProps) {
   const locked = lockedReason != null;
   const unavailable = locked || quantity <= 0 || disabled;
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
-      accessibilityLabel="Swap"
+      accessibilityLabel={`Swap two lane totals, ${quantity} remaining`}
+      accessibilityState={{ disabled: unavailable && !active, selected: active }}
       disabled={unavailable && !active}
       onPress={onPress}
       style={[

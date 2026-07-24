@@ -11,6 +11,7 @@ node_modules/
 .expo/
 dist/
 web-build/
+coverage/
 expo-env.d.ts
 
 # Native
@@ -41,3 +42,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+.env
+
+# Supabase CLI local cache
+supabase/.temp/

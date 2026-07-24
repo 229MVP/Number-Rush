@@ -15,20 +15,31 @@ import { GridBackground } from '../components/GridBackground';
 import { NeonButton } from '../components/NeonButton';
 import { ScreenTopBar } from '../components/ScreenTopBar';
 import type { RootStackParamList } from '../navigation/navigationTypes';
+import { rewardedAdsEnabled } from '../config/featureFlags';
+import { useAds } from '../hooks/useAds';
 import type { PlayerInventory, PlayerProfile } from '../progression/progressionTypes';
 import {
+  applyEconomyTransaction,
+  createTransactionId,
   getPlayerInventory,
   getPlayerProfile,
 } from '../storage/playerStorage';
+import {
+  canClaimDailyFreePowerup,
+  claimDailyFreePowerup,
+  readAdFrequencyState,
+} from '../storage/adFrequencyStorage';
 import { colors, fontFamilies, neonGlow, radii, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PowerUps'>;
+
+type AvailLabel = 'USABLE IN CLASSIC' | 'DISABLED IN DAILY' | 'DISABLED IN RANKED';
 
 type PowerRow = {
   key: keyof PlayerInventory;
   name: string;
   description: string;
-  status: 'AVAILABLE' | 'COMING TO GAMEPLAY';
+  labels: AvailLabel[];
   color: string;
   icon: 'x2' | 'swap' | 'bomb' | 'freeze' | 'shield' | 'wild';
 };
@@ -37,60 +48,70 @@ const ROWS: PowerRow[] = [
   {
     key: 'multiplier',
     name: 'MULTIPLIER',
-    description: 'Double a tile value in Classic mode.',
-    status: 'AVAILABLE',
+    description: 'Double the next tile value.',
+    labels: ['USABLE IN CLASSIC', 'DISABLED IN DAILY', 'DISABLED IN RANKED'],
     color: colors.orange,
     icon: 'x2',
   },
   {
     key: 'swap',
     name: 'SWAP',
-    description: 'Swap two lane totals in Classic mode.',
-    status: 'AVAILABLE',
+    description: 'Exchange the totals of two lanes.',
+    labels: ['USABLE IN CLASSIC', 'DISABLED IN DAILY', 'DISABLED IN RANKED'],
     color: colors.electricBlue,
     icon: 'swap',
   },
   {
     key: 'bomb',
-    name: 'BOMB TILE',
-    description: 'Clear a lane of your choice.',
-    status: 'COMING TO GAMEPLAY',
+    name: 'BOMB',
+    description: 'Clear one lane without placing a tile.',
+    labels: ['USABLE IN CLASSIC', 'DISABLED IN DAILY', 'DISABLED IN RANKED'],
     color: colors.red,
     icon: 'bomb',
   },
   {
     key: 'freeze',
-    name: 'FREEZE CARD',
-    description: 'Freeze pressure for a moment.',
-    status: 'COMING TO GAMEPLAY',
+    name: 'FREEZE',
+    description: 'Use the current tile for one extra turn.',
+    labels: ['USABLE IN CLASSIC', 'DISABLED IN DAILY', 'DISABLED IN RANKED'],
     color: colors.cyan,
     icon: 'freeze',
   },
   {
     key: 'shield',
     name: 'SHIELD',
-    description: 'Protect from a strike.',
-    status: 'COMING TO GAMEPLAY',
+    description: 'Block the next lost strike.',
+    labels: ['USABLE IN CLASSIC', 'DISABLED IN DAILY', 'DISABLED IN RANKED'],
     color: colors.electricBlue,
     icon: 'shield',
   },
   {
     key: 'wild',
-    name: 'WILD TILE',
-    description: 'Acts as the value you need.',
-    status: 'COMING TO GAMEPLAY',
+    name: 'WILD',
+    description: 'Choose a value from 1 through 10.',
+    labels: ['USABLE IN CLASSIC', 'DISABLED IN DAILY', 'DISABLED IN RANKED'],
     color: colors.purple,
     icon: 'wild',
   },
 ];
 
-function RowIcon({
-  icon,
-  color,
-}: {
-  icon: PowerRow['icon'];
-  color: string;
-}) {
+type FreePowerKey = 'multiplier' | 'swap' | 'bomb' | 'freeze' | 'shield';
+
+const FREE_POWER_OPTIONS: Array<{ key: FreePowerKey; label: string }> = [
+  { key: 'multiplier', label: 'MULTI' },
+  { key: 'swap', label: 'SWAP' },
+  { key: 'bomb', label: 'BOMB' },
+  { key: 'freeze', label: 'FREEZE' },
+  { key: 'shield', label: 'SHIELD' },
+];
+
+const LABEL_COLORS: Record<AvailLabel, string> = {
+  'USABLE IN CLASSIC': colors.green,
+  'DISABLED IN DAILY': colors.muted,
+  'DISABLED IN RANKED': colors.muted,
+};
+
+function RowIcon({ icon, color }: { icon: PowerRow['icon']; color: string }) {
   if (icon === 'x2') {
     return <Text style={[styles.x2, { color }]}>x2</Text>;
   }
@@ -100,21 +121,29 @@ function RowIcon({
   if (icon === 'bomb') return <Zap size={22} color={color} />;
   if (icon === 'freeze') return <Snowflake size={22} color={color} />;
   if (icon === 'shield') return <Shield size={22} color={color} />;
+  if (icon === 'wild') return <HelpCircle size={22} color={color} />;
   return <HelpCircle size={22} color={color} />;
 }
 
 export function PowerUpsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const ads = useAds();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [inventory, setInventory] = useState<PlayerInventory | null>(null);
+  const [freePower, setFreePower] = useState<FreePowerKey>('multiplier');
+  const [freeAvailable, setFreeAvailable] = useState(false);
+  const [freeBusy, setFreeBusy] = useState(false);
+  const [freeMessage, setFreeMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [p, inv] = await Promise.all([
+    const [p, inv, freq] = await Promise.all([
       getPlayerProfile(),
       getPlayerInventory(),
+      readAdFrequencyState(),
     ]);
     setProfile(p);
     setInventory(inv);
+    setFreeAvailable(canClaimDailyFreePowerup(freq));
   }, []);
 
   useFocusEffect(
@@ -122,6 +151,42 @@ export function PowerUpsScreen({ navigation }: Props) {
       void refresh();
     }, [refresh]),
   );
+
+  const claimFreePowerup = () => {
+    if (freeBusy || !freeAvailable || !rewardedAdsEnabled || !ads.adsAvailable) {
+      return;
+    }
+    setFreeBusy(true);
+    setFreeMessage(null);
+    void (async () => {
+      try {
+        const result = await ads.showRewarded({
+          placement: 'daily_free_powerup',
+          opportunityId: `daily-${freePower}`,
+        });
+        if (!result.earned) return;
+        const claimed = await claimDailyFreePowerup();
+        if (!claimed) {
+          setFreeMessage('Already claimed today');
+          return;
+        }
+        await applyEconomyTransaction({
+          id: createTransactionId(`daily-free-${freePower}`),
+          type: 'shop_purchase',
+          coinsDelta: 0,
+          gemsDelta: 0,
+          inventoryChanges: { [freePower]: 1 },
+          source: 'daily_free_powerup_ad',
+          createdAt: new Date().toISOString(),
+        });
+        setFreeMessage(`+1 ${freePower.toUpperCase()} added`);
+        setFreeAvailable(false);
+        await refresh();
+      } finally {
+        setFreeBusy(false);
+      }
+    })();
+  };
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -149,6 +214,49 @@ export function PowerUpsScreen({ navigation }: Props) {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
+        {rewardedAdsEnabled ? (
+          <View style={[styles.freeCard, neonGlow(colors.cyan, 6)]}>
+            <Text style={styles.freeTitle}>FREE POWER-UP</Text>
+            <Text style={styles.desc}>
+              Pick a power-up, watch an ad, and get +1 once per UTC day.
+            </Text>
+            <View style={styles.freeRow}>
+              {FREE_POWER_OPTIONS.map((opt) => {
+                const on = freePower === opt.key;
+                return (
+                  <Pressable
+                    key={opt.key}
+                    onPress={() => setFreePower(opt.key)}
+                    style={[styles.freeChip, on && styles.freeChipOn]}
+                  >
+                    <Text style={[styles.freeChipText, on && styles.freeChipTextOn]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <NeonButton
+              label={
+                freeBusy
+                  ? 'LOADING…'
+                  : freeAvailable
+                    ? 'WATCH AD & CLAIM'
+                    : 'CLAIMED TODAY'
+              }
+              color={colors.cyan}
+              size="small"
+              disabled={
+                freeBusy || !freeAvailable || !ads.adsAvailable
+              }
+              onPress={claimFreePowerup}
+            />
+            {freeMessage ? (
+              <Text style={styles.freeMsg}>{freeMessage}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
         {inventory
           ? ROWS.map((row) => {
               const qty = inventory[row.key];
@@ -173,30 +281,33 @@ export function PowerUpsScreen({ navigation }: Props) {
                   >
                     <RowIcon icon={row.icon} color={row.color} />
                   </View>
+
                   <View style={styles.body}>
                     <Text style={[styles.name, { color: row.color }]}>
                       {row.name}
                     </Text>
                     <Text style={styles.desc}>{row.description}</Text>
-                    <Text
-                      style={[
-                        styles.status,
-                        {
-                          color:
-                            row.status === 'AVAILABLE'
-                              ? colors.green
-                              : colors.muted,
-                        },
-                      ]}
-                    >
-                      {row.status}
-                    </Text>
+                    <View style={styles.labelsRow}>
+                      {row.labels.map((lbl) => (
+                        <Text
+                          key={lbl}
+                          style={[styles.label, { color: LABEL_COLORS[lbl] }]}
+                        >
+                          {lbl}
+                        </Text>
+                      ))}
+                    </View>
                   </View>
+
                   <View style={styles.qtyCol}>
                     <Text style={styles.qty}>{qty}</Text>
                     <Text style={styles.owned}>OWNED</Text>
                     {low ? (
-                      <Pressable onPress={() => navigation.navigate('Shop')}>
+                      <Pressable
+                        onPress={() =>
+                          navigation.navigate('Shop', { initialTab: 'powerup' })
+                        }
+                      >
                         <Text style={styles.shopLink}>SHOP</Text>
                       </Pressable>
                     ) : null}
@@ -209,7 +320,7 @@ export function PowerUpsScreen({ navigation }: Props) {
         <NeonButton
           label="OPEN SHOP"
           color={colors.purple}
-          onPress={() => navigation.navigate('Shop')}
+          onPress={() => navigation.navigate('Shop', { initialTab: 'powerup' })}
         />
       </ScrollView>
     </View>
@@ -220,6 +331,44 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   decor: { ...StyleSheet.absoluteFill },
   scroll: { padding: 16, gap: 10, paddingBottom: 28 },
+  freeCard: {
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    borderColor: withAlpha(colors.cyan, 0.35),
+    padding: 14,
+    gap: 10,
+  },
+  freeTitle: {
+    fontFamily: fontFamilies.orbitronBold,
+    fontSize: 12,
+    color: colors.cyan,
+    letterSpacing: 1,
+  },
+  freeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  freeChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: withAlpha(colors.cyan, 0.25),
+    backgroundColor: colors.card,
+  },
+  freeChipOn: {
+    borderColor: colors.cyan,
+    backgroundColor: withAlpha(colors.cyan, 0.12),
+  },
+  freeChipText: {
+    fontFamily: fontFamilies.rajdhaniBold,
+    fontSize: 10,
+    color: colors.muted,
+  },
+  freeChipTextOn: { color: colors.cyan },
+  freeMsg: {
+    fontFamily: fontFamilies.rajdhaniBold,
+    fontSize: 11,
+    color: colors.green,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -241,7 +390,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.orbitronBlack,
     fontSize: 18,
   },
-  body: { flex: 1, gap: 2 },
+  body: { flex: 1, gap: 3 },
   name: {
     fontFamily: fontFamilies.orbitronBold,
     fontSize: 12,
@@ -252,10 +401,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.muted,
   },
-  status: {
+  labelsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
+  label: {
     fontFamily: fontFamilies.rajdhaniBold,
-    fontSize: 10,
-    marginTop: 2,
+    fontSize: 9,
+    letterSpacing: 0.3,
   },
   qtyCol: { alignItems: 'center', minWidth: 52 },
   qty: {
