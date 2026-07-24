@@ -35,7 +35,7 @@ export function ComingSoonScreen({ navigation, config }: Props) {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: insets.top }]} testID="screen-coming-soon">
       <View style={[styles.decorLayer, { pointerEvents: 'none' as const }]}>
         <GridBackground opacity={0.04} />
         <AnimatedNeonBackground intensity="menu" />

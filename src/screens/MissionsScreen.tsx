@@ -115,7 +115,7 @@ export function MissionsScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: insets.top }]} testID="screen-missions">
       <View style={[styles.decor, { pointerEvents: 'none' }]}>
         <GridBackground opacity={0.04} />
         <AnimatedNeonBackground intensity="menu" />

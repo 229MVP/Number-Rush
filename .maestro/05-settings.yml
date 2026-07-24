@@ -1,0 +1,14 @@
+# BLOCKER: Replace appId with final android.package / ios.bundleIdentifier once assigned.
+appId: number.rush.placeholder
+---
+- launchApp
+- tapOn:
+    id: "splash-start"
+- tapOn:
+    id: "menu-settings"
+- assertVisible:
+    id: "screen-settings"
+- assertVisible:
+    id: "settings-beta-feedback"
+- assertVisible:
+    id: "settings-legal"

@@ -133,6 +133,7 @@ export function SplashScreen({ navigation }: Props) {
 
       {/* Full-screen interaction layer on top of visuals */}
       <Pressable
+        testID="splash-start"
         accessibilityRole="button"
         accessibilityLabel="Tap to start"
         onPress={start}

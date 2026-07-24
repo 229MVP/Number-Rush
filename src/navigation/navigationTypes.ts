@@ -29,6 +29,8 @@ export type RootStackParamList = {
   Leaderboard: undefined;
   Profile: undefined;
   PowerUps: undefined;
+  BetaFeedback: undefined;
+  LegalInfo: { section?: 'privacy' | 'terms' | 'data' | 'licenses' } | undefined;
 };
 
 export type BottomNavRoute = 'MainMenu' | 'Missions' | 'Leaderboard' | 'Profile';

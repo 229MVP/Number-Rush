@@ -1,0 +1,48 @@
+{
+  "$comment": "Draft store metadata placeholders. Replace before submit. Do not invent final android.package / ios.bundleIdentifier here — those belong in Expo config once assigned.",
+  "appName": "Number Rush",
+  "slug": "number-rush",
+  "version": "1.0.0",
+  "platforms": ["android", "ios"],
+  "android": {
+    "package": "ASSIGN_BEFORE_RELEASE",
+    "versionCode": 1,
+    "status": "BLOCKED_MISSING_PACKAGE"
+  },
+  "ios": {
+    "bundleIdentifier": "ASSIGN_BEFORE_RELEASE",
+    "buildNumber": "1",
+    "status": "BLOCKED_MISSING_BUNDLE_ID"
+  },
+  "listing": {
+    "shortDescription": "Neon puzzle rush — stack numbers, hit targets, chase your best score.",
+    "fullDescriptionFile": "docs/store-listing.md",
+    "category": "Games/Puzzle",
+    "keywords": ["puzzle", "numbers", "neon", "arcade", "daily challenge", "offline"],
+    "contentClaims": {
+      "onlineMultiplayer": false,
+      "realMoneyGambling": false,
+      "ads": false,
+      "iap": false,
+      "accountsRequired": false,
+      "rankedLive": false,
+      "leaderboardLive": false,
+      "dailyMode": "local",
+      "audio": "placeholder"
+    }
+  },
+  "screenshots": {
+    "directory": "assets/store-screenshots",
+    "plannedCount": 8,
+    "planFile": "docs/store-screenshot-plan.md"
+  },
+  "legal": {
+    "privacyPolicyUrl": "",
+    "termsUrl": "",
+    "draftFiles": [
+      "docs/privacy-policy-draft.md",
+      "docs/terms-draft.md"
+    ]
+  },
+  "supportEmail": "SUPPORT_EMAIL_TODO"
+}

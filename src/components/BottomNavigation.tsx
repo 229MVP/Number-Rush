@@ -17,11 +17,12 @@ const ITEMS: Array<{
   route: BottomNavRoute;
   label: string;
   Icon: React.ComponentType<{ size?: number; color?: string }>;
+  testID: string;
 }> = [
-  { route: 'MainMenu', label: 'HOME', Icon: Home },
-  { route: 'Missions', label: 'MISSIONS', Icon: Target },
-  { route: 'Leaderboard', label: 'RANKS', Icon: Trophy },
-  { route: 'Profile', label: 'PROFILE', Icon: User },
+  { route: 'MainMenu', label: 'HOME', Icon: Home, testID: 'nav-home' },
+  { route: 'Missions', label: 'MISSIONS', Icon: Target, testID: 'nav-missions' },
+  { route: 'Leaderboard', label: 'RANKS', Icon: Trophy, testID: 'nav-ranks' },
+  { route: 'Profile', label: 'PROFILE', Icon: User, testID: 'nav-profile' },
 ];
 
 export function BottomNavigation({
@@ -40,7 +41,7 @@ export function BottomNavigation({
         style,
       ]}
     >
-      {ITEMS.map(({ route, label, Icon }) => {
+      {ITEMS.map(({ route, label, Icon, testID }) => {
         const on = activeRoute === route;
         const color = on ? colors.neonPink : colors.muted;
         const showBadge =
@@ -48,6 +49,7 @@ export function BottomNavigation({
         return (
           <Pressable
             key={route}
+            testID={testID}
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
             hitSlop={6}

@@ -79,12 +79,14 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 function ChevronRow({
   label,
   onPress,
+  testID,
 }: {
   label: string;
   onPress: () => void;
+  testID?: string;
 }) {
   return (
-    <Pressable style={styles.row} onPress={onPress} hitSlop={6}>
+    <Pressable testID={testID} style={styles.row} onPress={onPress} hitSlop={6}>
       <Text style={styles.rowLabel}>{label}</Text>
       <Text style={styles.chevron}>›</Text>
     </Pressable>
@@ -214,7 +216,7 @@ export function SettingsScreen({ navigation }: Props) {
   const confirmed = resetText.trim() === 'RESET';
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: insets.top }]} testID="screen-settings">
       <View style={[styles.decor, { pointerEvents: 'none' }]}>
         <GridBackground opacity={0.04} />
         <AnimatedNeonBackground intensity="menu" />
@@ -333,17 +335,29 @@ export function SettingsScreen({ navigation }: Props) {
         <View style={styles.section}>
           <InfoRow label="Language" value="English" />
           <ChevronRow
-            label="Privacy"
+            label="Legal (DRAFT)"
             onPress={() => {
               tap();
-              Alert.alert('Privacy', 'Privacy policy will be available in a future update.');
+              navigation.navigate('LegalInfo', { section: 'privacy' });
             }}
+            testID="settings-legal"
+          />
+          <ChevronRow
+            label="Beta Feedback"
+            onPress={() => {
+              tap();
+              navigation.navigate('BetaFeedback');
+            }}
+            testID="settings-beta-feedback"
           />
           <ChevronRow
             label="Support"
             onPress={() => {
               tap();
-              Alert.alert('Support', 'Support options will be available in a future update.');
+              Alert.alert(
+                'Support',
+                'Use Beta Feedback in Settings to share a local report. Hosted support contact coming later.',
+              );
             }}
           />
         </View>

@@ -94,6 +94,7 @@ export function MainMenuScreen({ navigation }: Props) {
           </View>
         </View>
         <NeonIconButton
+          testID="menu-settings"
           accessibilityLabel="Settings"
           onPress={() => navigation.navigate('Settings')}
           color={colors.muted}
@@ -109,6 +110,7 @@ export function MainMenuScreen({ navigation }: Props) {
 
         <View style={[styles.buttons, { pointerEvents: 'box-none' }]}>
           <NeonButton
+            testID="menu-play"
             label="PLAY"
             color={accent}
             size="large"
@@ -119,6 +121,7 @@ export function MainMenuScreen({ navigation }: Props) {
           />
           <View style={styles.buttonWrap}>
             <NeonButton
+              testID="menu-daily"
               label="DAILY TOURNAMENT"
               color={colors.orange}
               size="large"
@@ -138,6 +141,7 @@ export function MainMenuScreen({ navigation }: Props) {
             ) : null}
           </View>
           <NeonButton
+            testID="menu-ranked"
             label="RANKED"
             color={colors.electricBlue}
             size="large"
@@ -145,6 +149,7 @@ export function MainMenuScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Ranked')}
           />
           <NeonButton
+            testID="menu-shop"
             label="SHOP"
             color={colors.purple}
             size="large"

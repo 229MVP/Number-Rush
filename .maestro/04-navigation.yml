@@ -1,0 +1,22 @@
+# BLOCKER: Replace appId with final android.package / ios.bundleIdentifier once assigned.
+appId: number.rush.placeholder
+---
+- launchApp
+- tapOn:
+    id: "splash-start"
+- tapOn:
+    id: "nav-missions"
+- assertVisible:
+    id: "screen-missions"
+- tapOn:
+    id: "nav-ranks"
+- assertVisible:
+    id: "screen-coming-soon"
+- tapOn:
+    id: "nav-profile"
+- assertVisible:
+    id: "screen-profile"
+- tapOn:
+    id: "nav-home"
+- assertVisible:
+    id: "menu-play"
