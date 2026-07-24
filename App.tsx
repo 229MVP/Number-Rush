@@ -23,6 +23,10 @@ import {
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { SettingsProvider } from './src/settings/SettingsProvider';
+import { AudioProvider } from './src/audio/AudioProvider';
+import { HapticsProvider } from './src/haptics/HapticsProvider';
+import { GameThemeProvider } from './src/themes/GameThemeProvider';
 import { colors } from './src/theme';
 
 export default function App() {
@@ -53,8 +57,16 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
-      <AppNavigator />
+      <SettingsProvider>
+        <AudioProvider>
+          <HapticsProvider>
+            <GameThemeProvider>
+              <StatusBar style="light" />
+              <AppNavigator />
+            </GameThemeProvider>
+          </HapticsProvider>
+        </AudioProvider>
+      </SettingsProvider>
     </SafeAreaProvider>
   );
 }

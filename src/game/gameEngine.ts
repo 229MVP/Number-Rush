@@ -6,6 +6,7 @@ import {
   TARGET_VALUE,
 } from './gameConstants';
 import { getClassicConfig } from './gameModes';
+import type { RunPowerInventory } from './powerUpInventory';
 import { scorePerfectClear, comboMultiplierFromStreak } from './scoring';
 import { TileGenerator } from './tileGenerator';
 import type {
@@ -47,20 +48,24 @@ export type NewRunState = {
   multiplierQuantity: number;
   multiplierSelected: boolean;
   swapQuantity: number;
+  bombQuantity: number;
+  freezeQuantity: number;
+  shieldQuantity: number;
+  wildQuantity: number;
   tileGenerator: TileGenerator;
   config: RunConfiguration;
 };
 
 export function createNewRun(
   config: RunConfiguration = getClassicConfig(),
+  startingInventory?: Partial<RunPowerInventory>,
 ): NewRunState {
   const tileGenerator = config.seed
     ? TileGenerator.fromSeed(config.seed)
     : new TileGenerator();
   const currentTile = tileGenerator.next();
   const nextTile = tileGenerator.next();
-  const powerQty = config.powerUpsEnabled ? MULTIPLIER_STARTING_QUANTITY : 0;
-  const swapQty = config.powerUpsEnabled ? SWAP_STARTING_QUANTITY : 0;
+  const enabled = config.powerUpsEnabled;
   return {
     lanes: createEmptyLanes(),
     score: 0,
@@ -70,9 +75,20 @@ export function createNewRun(
     currentTile,
     nextTile,
     runStats: createEmptyRunStats(),
-    multiplierQuantity: powerQty,
+    multiplierQuantity: enabled
+      ? Math.max(
+          0,
+          startingInventory?.multiplier ?? MULTIPLIER_STARTING_QUANTITY,
+        )
+      : 0,
     multiplierSelected: false,
-    swapQuantity: swapQty,
+    swapQuantity: enabled
+      ? Math.max(0, startingInventory?.swap ?? SWAP_STARTING_QUANTITY)
+      : 0,
+    bombQuantity: enabled ? Math.max(0, startingInventory?.bomb ?? 0) : 0,
+    freezeQuantity: enabled ? Math.max(0, startingInventory?.freeze ?? 0) : 0,
+    shieldQuantity: enabled ? Math.max(0, startingInventory?.shield ?? 0) : 0,
+    wildQuantity: enabled ? Math.max(0, startingInventory?.wild ?? 0) : 0,
     tileGenerator,
     config,
   };
@@ -81,8 +97,27 @@ export function createNewRun(
 export function effectiveTileValue(
   tile: NumberTileData,
   multiplierSelected: boolean,
+  wildValue: number | null = null,
 ): number {
+  if (wildValue != null) {
+    return Math.max(1, Math.min(10, Math.floor(wildValue)));
+  }
   return multiplierSelected ? tile.value * MULTIPLIER_FACTOR : tile.value;
+}
+
+export function clearLaneWithBomb(
+  lanes: LaneState[],
+  laneIndex: number,
+): { ok: true; lanes: LaneState[] } | { ok: false; reason: string } {
+  const lane = lanes[laneIndex];
+  if (!lane) return { ok: false, reason: 'Invalid lane' };
+  if (lane.total <= 0) return { ok: false, reason: 'Lane is empty' };
+  const next = lanes.map((l, i) =>
+    i === laneIndex
+      ? { ...l, total: 0, status: 'default' as const }
+      : { ...l, status: 'default' as const },
+  );
+  return { ok: true, lanes: next };
 }
 
 /**
@@ -102,6 +137,9 @@ export function resolveLanePlacement(args: {
   multiplierQuantity: number;
   tileGenerator: TileGenerator;
   maximumTiles?: number | null;
+  wildValue?: number | null;
+  freezeActive?: boolean;
+  shieldArmed?: boolean;
 }): PlacementResult & {
   lanes: LaneState[];
   score: number;
@@ -127,15 +165,25 @@ export function resolveLanePlacement(args: {
     multiplierQuantity,
     tileGenerator,
     maximumTiles = null,
+    wildValue = null,
+    freezeActive = false,
+    shieldArmed = false,
   } = args;
 
   const previousTotal = lanes[laneIndex].total;
-  const value = effectiveTileValue(currentTile, multiplierSelected);
+  const usingWild = wildValue != null;
+  const value = effectiveTileValue(
+    currentTile,
+    usingWild ? false : multiplierSelected,
+    wildValue,
+  );
   const newTotal = previousTotal + value;
-  const consumedMultiplier = multiplierSelected;
+  const consumedMultiplier = !usingWild && multiplierSelected;
   const nextMultiplierQuantity = consumedMultiplier
     ? Math.max(0, multiplierQuantity - 1)
     : multiplierQuantity;
+  const consumedWild = usingWild;
+  const consumedFreeze = freezeActive;
 
   const nextLanes = lanes.map((lane, i) =>
     i === laneIndex ? { ...lane } : { ...lane, status: 'default' as const },
@@ -146,7 +194,17 @@ export function resolveLanePlacement(args: {
     return {
       tileLimitReached: hitLimit,
       gameOver: alreadyOver || hitLimit,
-      holdTiles: hitLimit,
+      holdTiles: hitLimit || freezeActive,
+    };
+  };
+
+  const advanceTiles = (holdTiles: boolean) => {
+    if (holdTiles) {
+      return { currentTile, nextTile };
+    }
+    return {
+      currentTile: nextTile,
+      nextTile: tileGenerator.next(),
     };
   };
 
@@ -160,7 +218,10 @@ export function resolveLanePlacement(args: {
       perfectClears: runStats.perfectClears + 1,
       tilesPlaced: runStats.tilesPlaced + 1,
       longestPerfectStreak: Math.max(runStats.longestPerfectStreak, newStreak),
-      maxComboMultiplier: Math.max(runStats.maxComboMultiplier, comboMultiplier),
+      maxComboMultiplier: Math.max(
+        runStats.maxComboMultiplier,
+        comboMultiplier,
+      ),
     };
     nextLanes[laneIndex] = {
       ...nextLanes[laneIndex],
@@ -168,8 +229,7 @@ export function resolveLanePlacement(args: {
       status: 'perfect',
     };
     const limit = markLimit(nextStats.tilesPlaced, false);
-    const advancedCurrent = limit.holdTiles ? currentTile : nextTile;
-    const advancedNext = limit.holdTiles ? nextTile : tileGenerator.next();
+    const tiles = advanceTiles(limit.holdTiles);
     return {
       outcome: 'perfect',
       laneIndex,
@@ -181,24 +241,33 @@ export function resolveLanePlacement(args: {
       comboStreak: newStreak,
       comboMultiplier,
       consumedMultiplier,
+      consumedFreeze,
+      consumedWild,
+      consumedShield: false,
+      shieldBlocked: false,
       gameOver: limit.gameOver,
       tileLimitReached: limit.tileLimitReached,
       lanes: nextLanes,
       score: nextScore,
       runStats: nextStats,
-      currentTile: advancedCurrent,
-      nextTile: advancedNext,
+      currentTile: tiles.currentTile,
+      nextTile: tiles.nextTile,
       multiplierQuantity: nextMultiplierQuantity,
       multiplierSelected: false,
     };
   }
 
   if (newTotal > TARGET_VALUE) {
-    const nextStrikes = Math.max(0, strikesRemaining - 1);
+    const shieldBlocked = shieldArmed;
+    const nextStrikes = shieldBlocked
+      ? strikesRemaining
+      : Math.max(0, strikesRemaining - 1);
     const nextStats: RunStats = {
       ...runStats,
       tilesPlaced: runStats.tilesPlaced + 1,
-      strikesUsed: runStats.strikesUsed + 1,
+      strikesUsed: shieldBlocked
+        ? runStats.strikesUsed
+        : runStats.strikesUsed + 1,
       score,
     };
     nextLanes[laneIndex] = {
@@ -207,8 +276,7 @@ export function resolveLanePlacement(args: {
       status: 'bust',
     };
     const limit = markLimit(nextStats.tilesPlaced, nextStrikes <= 0);
-    const advancedCurrent = limit.holdTiles ? currentTile : nextTile;
-    const advancedNext = limit.holdTiles ? nextTile : tileGenerator.next();
+    const tiles = advanceTiles(limit.holdTiles);
     return {
       outcome: 'bust',
       laneIndex,
@@ -220,13 +288,17 @@ export function resolveLanePlacement(args: {
       comboStreak: 0,
       comboMultiplier: 1,
       consumedMultiplier,
+      consumedFreeze,
+      consumedWild,
+      consumedShield: shieldBlocked,
+      shieldBlocked,
       gameOver: limit.gameOver,
       tileLimitReached: limit.tileLimitReached,
       lanes: nextLanes,
       score,
       runStats: nextStats,
-      currentTile: advancedCurrent,
-      nextTile: advancedNext,
+      currentTile: tiles.currentTile,
+      nextTile: tiles.nextTile,
       multiplierQuantity: nextMultiplierQuantity,
       multiplierSelected: false,
     };
@@ -243,8 +315,7 @@ export function resolveLanePlacement(args: {
     status: 'receiving',
   };
   const limit = markLimit(nextStats.tilesPlaced, false);
-  const advancedCurrent = limit.holdTiles ? currentTile : nextTile;
-  const advancedNext = limit.holdTiles ? nextTile : tileGenerator.next();
+  const tiles = advanceTiles(limit.holdTiles);
   return {
     outcome: 'normal',
     laneIndex,
@@ -256,13 +327,17 @@ export function resolveLanePlacement(args: {
     comboStreak,
     comboMultiplier: comboMultiplierFromStreak(comboStreak),
     consumedMultiplier,
+    consumedFreeze,
+    consumedWild,
+    consumedShield: false,
+    shieldBlocked: false,
     gameOver: limit.gameOver,
     tileLimitReached: limit.tileLimitReached,
     lanes: nextLanes,
     score,
     runStats: nextStats,
-    currentTile: advancedCurrent,
-    nextTile: advancedNext,
+    currentTile: tiles.currentTile,
+    nextTile: tiles.nextTile,
     multiplierQuantity: nextMultiplierQuantity,
     multiplierSelected: false,
   };

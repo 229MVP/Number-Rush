@@ -12,7 +12,7 @@ function formatCount(n: number): string {
   return n.toLocaleString('en-US');
 }
 
-export function CurrencyChip({ coins = 12450, gems = 350, style }: Props) {
+export function CurrencyChip({ coins = 500, gems = 25, style }: Props) {
   return (
     <View style={[styles.chip, style]}>
       <Text style={[styles.icon, { color: colors.yellow }]}>⬡</Text>

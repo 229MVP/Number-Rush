@@ -9,6 +9,8 @@ type Props = {
   activeRoute: BottomNavRoute;
   onNavigate: (route: BottomNavRoute) => void;
   style?: ViewStyle;
+  /** Claimable mission count badge on Missions tab. */
+  missionsBadgeCount?: number;
 };
 
 const ITEMS: Array<{
@@ -22,7 +24,12 @@ const ITEMS: Array<{
   { route: 'Profile', label: 'PROFILE', Icon: User },
 ];
 
-export function BottomNavigation({ activeRoute, onNavigate, style }: Props) {
+export function BottomNavigation({
+  activeRoute,
+  onNavigate,
+  style,
+  missionsBadgeCount = 0,
+}: Props) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -36,6 +43,8 @@ export function BottomNavigation({ activeRoute, onNavigate, style }: Props) {
       {ITEMS.map(({ route, label, Icon }) => {
         const on = activeRoute === route;
         const color = on ? colors.neonPink : colors.muted;
+        const showBadge =
+          route === 'Missions' && missionsBadgeCount > 0;
         return (
           <Pressable
             key={route}
@@ -46,7 +55,16 @@ export function BottomNavigation({ activeRoute, onNavigate, style }: Props) {
             style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
           >
             <View style={[styles.itemInner, { pointerEvents: 'none' }]}>
-              <Icon size={20} color={color} />
+              <View style={styles.iconWrap}>
+                <Icon size={20} color={color} />
+                {showBadge ? (
+                  <View pointerEvents="none" style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {missionsBadgeCount > 9 ? '9+' : String(missionsBadgeCount)}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
               <Text style={[typography.navLabel, { color }]}>{label}</Text>
               {on ? (
                 <View style={[styles.indicator, neonGlow(colors.neonPink, 3)]} />
@@ -84,6 +102,27 @@ const styles = StyleSheet.create({
   itemInner: {
     alignItems: 'center',
     gap: 3,
+  },
+  iconWrap: {
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -10,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.neonPink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    fontFamily: typography.navLabel.fontFamily,
+    fontSize: 8,
+    fontWeight: '700',
+    color: colors.white,
   },
   indicator: {
     width: 18,

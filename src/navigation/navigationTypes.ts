@@ -16,15 +16,19 @@ export type RootStackParamList = {
     perfectClears: number;
     tilesPlaced: number;
     isNewBest: boolean;
+    rewardKey: string;
+    multipliersUsed: number;
+    swapsUsed: number;
   };
   Tournament: undefined;
   DailyResults: DailyResultsParams;
   Ranked: undefined;
-  Shop: undefined;
+  Shop: { initialTab?: 'powerup' | 'theme' | 'coins' | 'gems' } | undefined;
   Settings: undefined;
   Missions: undefined;
   Leaderboard: undefined;
   Profile: undefined;
+  PowerUps: undefined;
 };
 
 export type BottomNavRoute = 'MainMenu' | 'Missions' | 'Leaderboard' | 'Profile';

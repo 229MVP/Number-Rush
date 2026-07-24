@@ -4,11 +4,13 @@ import {
   InteractionManager,
   LayoutChangeEvent,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AnimatedNeonBackground } from '../components/AnimatedNeonBackground';
@@ -21,16 +23,21 @@ import {
   MultiplierPowerUpButton,
   NumberTile,
   PauseModal,
+  PowerUpTray,
   SwapPowerUpButton,
   TargetPanel,
   TutorialOverlay,
+  WildValuePicker,
 } from '../components/gameplay';
 import type { TutorialStep } from '../components/gameplay/TutorialOverlay';
+import { useOptionalAudio } from '../audio/AudioProvider';
 import { LANE_COUNT, TARGET_VALUE, TILE_MOVE_DURATION } from '../game/gameConstants';
 import { resolveRunConfig } from '../game/gameModes';
 import type { DailyResultsParams, GameOverPayload } from '../game/gameTypes';
+import { useOptionalHaptics } from '../haptics/HapticsProvider';
 import { useNumberRushGame } from '../hooks/useNumberRushGame';
 import type { RootStackParamList } from '../navigation/navigationTypes';
+import { useReducedMotionPreference } from '../settings/SettingsProvider';
 import {
   getTutorialCompleted,
   setTutorialCompleted,
@@ -39,19 +46,18 @@ import {
   measureTutorialTarget,
   type TutorialTargetRect,
 } from '../utils/measureTutorialTarget';
-import { colors, fontFamilies, withAlpha } from '../theme';
+import { colors, fontFamilies, neonGlow, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Gameplay'>;
 
 const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 
-/**
- * Traveling-tile animation uses a controlled approximation toward each lane's
- * horizontal center (equal-width columns) rather than measureInWindow, which is
- * fragile across Expo Web and native. The game still resolves after TILE_MOVE_DURATION.
- */
 export function GameplayScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
+  const reducedMotion = useReducedMotionPreference();
+  const audio = useOptionalAudio();
+  const haptics = useOptionalHaptics();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [tutorialVisible, setTutorialVisible] = useState(false);
   const [tutorialStep, setTutorialStep] = useState<TutorialStep>(1);
@@ -59,11 +65,16 @@ export function GameplayScreen({ navigation, route }: Props) {
     useState<TutorialTargetRect | null>(null);
   const [boardWidth, setBoardWidth] = useState(360);
   const [rootSize, setRootSize] = useState({ width: 0, height: 0 });
+  const [trayOpen, setTrayOpen] = useState(false);
+  const [wildPickerOpen, setWildPickerOpen] = useState(false);
 
   const gameplayRootRef = useRef<View>(null);
   const currentTileTargetRef = useRef<View>(null);
   const laneGroupTargetRef = useRef<View>(null);
   const targetPanelTargetRef = useRef<View>(null);
+  const prevCombo = useRef(1);
+  const prevStatus = useRef<string>('playing');
+  const lastPopupId = useRef<string | null>(null);
 
   const runConfig = useMemo(
     () =>
@@ -81,16 +92,18 @@ export function GameplayScreen({ navigation, route }: Props) {
 
   const onGameOver = useCallback(
     (payload: GameOverPayload) => {
+      audio?.playSound('gameOver');
       navigation.replace('GameOver', payload);
     },
-    [navigation],
+    [navigation, audio],
   );
 
   const onDailyComplete = useCallback(
     (params: DailyResultsParams) => {
+      audio?.playSound('victory');
       navigation.replace('DailyResults', params);
     },
-    [navigation],
+    [navigation, audio],
   );
 
   const game = useNumberRushGame({
@@ -98,6 +111,11 @@ export function GameplayScreen({ navigation, route }: Props) {
     onGameOver,
     onDailyComplete,
   });
+
+  useEffect(() => {
+    if (!focused) return;
+    void audio?.playMusic('gameplay');
+  }, [focused, audio]);
 
   useEffect(() => {
     if (runConfig.mode !== 'classic') return;
@@ -188,11 +206,71 @@ export function GameplayScreen({ navigation, route }: Props) {
     measureActiveTarget,
   ]);
 
+  const modalBlocking =
+    tutorialVisible ||
+    trayOpen ||
+    wildPickerOpen ||
+    game.gameStatus === 'paused';
+
   const inputLocked =
     game.gameStatus === 'resolving' ||
     game.gameStatus === 'paused' ||
     game.gameStatus === 'gameOver' ||
-    tutorialVisible;
+    tutorialVisible ||
+    trayOpen ||
+    wildPickerOpen;
+
+  // Feedback: popups / combo / status
+  useEffect(() => {
+    const latest = game.floatingPopups[game.floatingPopups.length - 1];
+    if (!latest || latest.id === lastPopupId.current) return;
+    lastPopupId.current = latest.id;
+    if (latest.kind === 'perfect') {
+      audio?.playSound('perfect');
+      haptics?.success();
+    } else if (latest.kind === 'bust') {
+      audio?.playSound('bust');
+      haptics?.error();
+      if (game.strikesRemaining <= 1) haptics?.warning();
+    } else if (latest.kind === 'shielded') {
+      audio?.playSound('shield');
+      haptics?.success();
+    } else if (latest.kind === 'bomb') {
+      audio?.playSound('bomb');
+      haptics?.heavyImpact();
+    } else {
+      audio?.playSound('tilePlace');
+      haptics?.lightImpact();
+    }
+  }, [game.floatingPopups, game.strikesRemaining, audio, haptics]);
+
+  useEffect(() => {
+    if (game.comboMultiplier > prevCombo.current) {
+      audio?.playSound('comboUp');
+      haptics?.mediumImpact();
+    }
+    prevCombo.current = game.comboMultiplier;
+  }, [game.comboMultiplier, audio, haptics]);
+
+  useEffect(() => {
+    if (
+      game.gameStatus === 'paused' &&
+      prevStatus.current !== 'paused'
+    ) {
+      audio?.playSound('buttonTap');
+    }
+    prevStatus.current = game.gameStatus;
+  }, [game.gameStatus, audio]);
+
+  // Open wild picker when wild selected without value
+  useEffect(() => {
+    if (game.wildSelected && game.selectedWildValue == null) {
+      setWildPickerOpen(true);
+    }
+    if (!game.wildSelected) {
+      setWildPickerOpen(false);
+    }
+  }, [game.wildSelected, game.selectedWildValue]);
 
   const travelAnim = useRef(new Animated.Value(0)).current;
   const [travelVisual, setTravelVisual] = useState<{
@@ -207,15 +285,51 @@ export function GameplayScreen({ navigation, route }: Props) {
     }
     setTravelVisual({
       laneIndex: game.travel.laneIndex,
-      value: game.travel.tile.value,
+      value: game.travel.effectiveValue,
     });
     travelAnim.setValue(0);
+    if (reducedMotion) {
+      Animated.timing(travelAnim, {
+        toValue: 1,
+        duration: 120,
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }).start();
+      return;
+    }
     Animated.timing(travelAnim, {
       toValue: 1,
       duration: TILE_MOVE_DURATION,
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
-  }, [game.travel, travelAnim]);
+  }, [game.travel, travelAnim, reducedMotion]);
+
+  // Keyboard controls (web/desktop)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (modalBlocking || game.gameStatus === 'resolving') {
+        if (e.key === 'Escape' && game.gameStatus === 'paused') {
+          e.preventDefault();
+          game.resumeGame();
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (trayOpen) setTrayOpen(false);
+        else if (game.gameStatus === 'playing') game.pauseGame();
+        return;
+      }
+      const laneKey = Number.parseInt(e.key, 10);
+      if (laneKey >= 1 && laneKey <= 4) {
+        e.preventDefault();
+        haptics?.selection();
+        game.placeTile(laneKey - 1);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [modalBlocking, game, trayOpen, haptics]);
 
   const onBoardLayout = (e: LayoutChangeEvent) => {
     setBoardWidth(e.nativeEvent.layout.width);
@@ -228,6 +342,7 @@ export function GameplayScreen({ navigation, route }: Props) {
 
   const quitToMenu = () => {
     game.quitGame();
+    void audio?.playMusic('menu');
     navigation.navigate('MainMenu');
   };
 
@@ -245,6 +360,12 @@ export function GameplayScreen({ navigation, route }: Props) {
   const laneWidth =
     (boardWidth - lanePad * 2 - laneGap * (LANE_COUNT - 1)) / LANE_COUNT;
 
+  const extraSelectedCount =
+    (game.bombSelected ? 1 : 0) +
+    (game.freezeSelected ? 1 : 0) +
+    (game.shieldArmed ? 1 : 0) +
+    (game.wildSelected ? 1 : 0);
+
   return (
     <View
       ref={gameplayRootRef}
@@ -252,9 +373,16 @@ export function GameplayScreen({ navigation, route }: Props) {
       style={[styles.root, { paddingTop: insets.top }]}
       onLayout={onRootLayout}
     >
-      <View style={[styles.decorLayer, { pointerEvents: 'none' }]}>
+      <View
+        style={[styles.decorLayer, { pointerEvents: 'none' }]}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+      >
         <GridBackground opacity={0.05} />
-        <AnimatedNeonBackground intensity="menu" />
+        <AnimatedNeonBackground
+          intensity="menu"
+          reducedMotion={reducedMotion || !focused}
+        />
         <PerspectiveGrid />
       </View>
 
@@ -264,11 +392,16 @@ export function GameplayScreen({ navigation, route }: Props) {
         strikesRemaining={game.strikesRemaining}
         scorePulseKey={game.scorePulseKey}
         comboPulseKey={game.comboPulseKey}
-        onPause={game.pauseGame}
+        onPause={() => {
+          audio?.playSound('buttonTap');
+          game.pauseGame();
+        }}
         pauseDisabled={inputLocked && game.gameStatus !== 'paused'}
         modeBadge={modeBadge}
         attemptLabel={attemptLabel}
         tilesRemaining={game.tilesRemaining}
+        shieldArmed={game.shieldArmed}
+        reducedMotion={reducedMotion}
       />
 
       <TargetPanel
@@ -291,14 +424,27 @@ export function GameplayScreen({ navigation, route }: Props) {
             key={lane.id}
             lane={lane}
             target={TARGET_VALUE}
-            disabled={inputLocked && game.swapMode === 'off'}
+            disabled={inputLocked && game.swapMode === 'off' && !game.bombSelected}
             selected={false}
             swapSelected={
               game.selectedSwapLane === idx || lane.status === 'selected'
             }
+            bombHighlight={game.bombPulseLane === idx}
+            reducedMotion={reducedMotion}
             onPress={() => {
-              if (game.swapMode !== 'off') game.selectSwapLane(idx);
-              else if (!inputLocked) game.placeTile(idx);
+              if (inputLocked && game.swapMode === 'off' && !game.bombSelected) {
+                return;
+              }
+              haptics?.selection();
+              if (game.swapMode !== 'off') {
+                game.selectSwapLane(idx);
+                if (game.swapMode === 'selectSecond') {
+                  audio?.playSound('swap');
+                  haptics?.mediumImpact();
+                }
+              } else {
+                game.placeTile(idx);
+              }
             }}
           />
         ))}
@@ -320,36 +466,39 @@ export function GameplayScreen({ navigation, route }: Props) {
               pointerEvents: 'none',
               opacity: travelAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [1, 0.55],
+                outputRange: reducedMotion ? [1, 0] : [1, 0.55],
               }),
-              transform: [
-                {
-                  translateX: travelAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [
-                      0,
-                      lanePad +
-                        travelVisual.laneIndex * (laneWidth + laneGap) +
-                        laneWidth / 2 -
-                        boardWidth / 2,
-                    ],
-                  }),
-                },
-                {
-                  translateY: travelAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -120],
-                  }),
-                },
-                {
-                  scale: travelAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [1, 0.75],
-                  }),
-                },
-              ],
+              transform: reducedMotion
+                ? []
+                : [
+                    {
+                      translateX: travelAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [
+                          0,
+                          lanePad +
+                            travelVisual.laneIndex * (laneWidth + laneGap) +
+                            laneWidth / 2 -
+                            boardWidth / 2,
+                        ],
+                      }),
+                    },
+                    {
+                      translateY: travelAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, -120],
+                      }),
+                    },
+                    {
+                      scale: travelAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 0.75],
+                      }),
+                    },
+                  ],
             },
           ]}
+          importantForAccessibility="no"
         >
           <View style={styles.travelInner}>
             <Text style={styles.travelValue}>{travelVisual.value}</Text>
@@ -362,6 +511,12 @@ export function GameplayScreen({ navigation, route }: Props) {
           tile={game.currentTile}
           variant="current"
           multiplierSelected={game.multiplierSelected}
+          freezeSelected={game.freezeSelected}
+          wildValue={
+            game.wildSelected && game.selectedWildValue != null
+              ? game.selectedWildValue
+              : null
+          }
           showEffective
           measureRef={currentTileTargetRef}
           onCardLayout={scheduleMeasure}
@@ -375,9 +530,29 @@ export function GameplayScreen({ navigation, route }: Props) {
           selected={game.multiplierSelected}
           disabled={inputLocked || !game.powerUpsEnabled}
           lockedReason={powerLocked}
-          onPress={game.toggleMultiplier}
+          onPress={() => {
+            audio?.playSound('buttonTap');
+            haptics?.selection();
+            game.toggleMultiplier();
+          }}
         />
         <View style={styles.instructions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`More power-ups, ${game.bombQuantity + game.freezeQuantity + game.shieldQuantity + game.wildQuantity} owned`}
+            disabled={!game.powerUpsEnabled || inputLocked}
+            onPress={() => {
+              audio?.playSound('buttonTap');
+              setTrayOpen(true);
+            }}
+            style={[
+              styles.trayBtn,
+              extraSelectedCount > 0 ? neonGlow(colors.cyan, 6) : null,
+              (!game.powerUpsEnabled || inputLocked) && { opacity: 0.45 },
+            ]}
+          >
+            <Text style={styles.trayBtnText}>+4</Text>
+          </Pressable>
           <Text style={styles.instructionMain}>{game.instructionText}</Text>
           <Text style={styles.instructionSub}>
             Hit exactly {TARGET_VALUE}. Don't go over.
@@ -388,15 +563,99 @@ export function GameplayScreen({ navigation, route }: Props) {
           active={game.swapMode !== 'off'}
           disabled={inputLocked || !game.powerUpsEnabled}
           lockedReason={powerLocked}
-          onPress={game.toggleSwap}
+          onPress={() => {
+            audio?.playSound('buttonTap');
+            haptics?.selection();
+            game.toggleSwap();
+          }}
         />
       </View>
+
+      <PowerUpTray
+        visible={trayOpen}
+        onClose={() => setTrayOpen(false)}
+        disabled={inputLocked}
+        lockedReason={powerLocked}
+        items={[
+          {
+            id: 'bomb',
+            name: 'BOMB',
+            quantity: game.bombQuantity,
+            selected: game.bombSelected,
+            color: colors.red,
+            onPress: () => {
+              audio?.playSound('buttonTap');
+              haptics?.selection();
+              game.toggleBomb();
+            },
+          },
+          {
+            id: 'freeze',
+            name: 'FREEZE',
+            quantity: game.freezeQuantity,
+            selected: game.freezeSelected,
+            color: colors.cyan,
+            onPress: () => {
+              audio?.playSound('freeze');
+              haptics?.selection();
+              game.toggleFreeze();
+            },
+          },
+          {
+            id: 'shield',
+            name: 'SHIELD',
+            quantity: game.shieldQuantity,
+            selected: game.shieldArmed,
+            color: colors.electricBlue,
+            onPress: () => {
+              audio?.playSound('buttonTap');
+              haptics?.selection();
+              game.toggleShield();
+            },
+          },
+          {
+            id: 'wild',
+            name: 'WILD',
+            quantity: game.wildQuantity,
+            selected: game.wildSelected,
+            color: colors.purple,
+            onPress: () => {
+              audio?.playSound('wild');
+              haptics?.selection();
+              game.openWildPicker();
+              setWildPickerOpen(true);
+            },
+          },
+        ]}
+      />
+
+      <WildValuePicker
+        visible={wildPickerOpen}
+        selectedValue={game.selectedWildValue}
+        onSelect={(n) => {
+          haptics?.selection();
+          game.confirmWildValue(n);
+        }}
+        onConfirm={(n) => {
+          audio?.playSound('wild');
+          haptics?.mediumImpact();
+          game.confirmWildValue(n);
+          setWildPickerOpen(false);
+        }}
+        onCancel={() => {
+          game.cancelWild();
+          setWildPickerOpen(false);
+        }}
+      />
 
       <PauseModal
         visible={game.gameStatus === 'paused'}
         mode={game.mode}
         officialAttempt={game.officialAttempt}
-        onResume={game.resumeGame}
+        onResume={() => {
+          audio?.playSound('buttonTap');
+          game.resumeGame();
+        }}
         onRestart={game.restartGame}
         onSettings={() => navigation.navigate('Settings')}
         onQuit={quitToMenu}
@@ -468,6 +727,24 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 4,
+    gap: 2,
+  },
+  trayBtn: {
+    minWidth: 44,
+    minHeight: 28,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: withAlpha(colors.cyan, 0.45),
+    backgroundColor: withAlpha(colors.cyan, 0.12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  trayBtnText: {
+    fontFamily: fontFamilies.orbitronBold,
+    fontSize: 11,
+    color: colors.cyan,
   },
   instructionMain: {
     fontFamily: fontFamilies.rajdhaniBold,
@@ -479,7 +756,6 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.rajdhaniSemiBold,
     fontSize: 9,
     color: colors.muted,
-    marginTop: 2,
     textAlign: 'center',
   },
   travelTile: {

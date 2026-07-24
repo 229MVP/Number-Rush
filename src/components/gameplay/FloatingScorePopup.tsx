@@ -41,7 +41,11 @@ export function FloatingScorePopup({ popup, xPercent }: Props) {
       ? colors.red
       : popup.kind === 'perfect'
         ? colors.orange
-        : colors.yellow;
+        : popup.kind === 'shielded'
+          ? colors.electricBlue
+          : popup.kind === 'bomb'
+            ? colors.red
+            : colors.yellow;
 
   return (
     <Animated.View

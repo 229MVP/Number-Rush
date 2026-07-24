@@ -7,6 +7,8 @@ const USE_NATIVE_DRIVER = Platform.OS !== 'web';
 type Props = {
   /** denser motion for splash; quieter for menu */
   intensity?: 'splash' | 'menu';
+  /** When true, render a calm static ambience with no shooting stars. */
+  reducedMotion?: boolean;
 };
 
 type StarConfig = {
@@ -186,10 +188,13 @@ function FloatingDot({ config }: { config: DotConfig }) {
 /**
  * Decorative neon ambience. Never intercepts touches.
  */
-export function AnimatedNeonBackground({ intensity = 'splash' }: Props) {
+export function AnimatedNeonBackground({
+  intensity = 'splash',
+  reducedMotion = false,
+}: Props) {
   const { width, height } = useWindowDimensions();
-  const starCount = intensity === 'splash' ? 6 : 4;
-  const dotCount = intensity === 'splash' ? 10 : 7;
+  const starCount = reducedMotion ? 0 : intensity === 'splash' ? 5 : 3;
+  const dotCount = reducedMotion ? 0 : intensity === 'splash' ? 8 : 5;
 
   const stars = useMemo(
     () => makeStars(starCount, width, height),
@@ -200,8 +205,12 @@ export function AnimatedNeonBackground({ intensity = 'splash' }: Props) {
     [dotCount, width, height],
   );
 
-  const ambience = useRef(new Animated.Value(0)).current;
+  const ambience = useRef(new Animated.Value(reducedMotion ? 0.5 : 0)).current;
   useEffect(() => {
+    if (reducedMotion) {
+      ambience.setValue(0.5);
+      return;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(ambience, {
@@ -220,7 +229,7 @@ export function AnimatedNeonBackground({ intensity = 'splash' }: Props) {
     );
     loop.start();
     return () => loop.stop();
-  }, [ambience]);
+  }, [ambience, reducedMotion]);
 
   const glowOpacity = ambience.interpolate({
     inputRange: [0, 1],
@@ -228,7 +237,11 @@ export function AnimatedNeonBackground({ intensity = 'splash' }: Props) {
   });
 
   return (
-    <View style={[styles.fill, { pointerEvents: 'none' }]}>
+    <View
+      style={[styles.fill, { pointerEvents: 'none' }]}
+      importantForAccessibility="no-hide-descendants"
+      accessibilityElementsHidden
+    >
       <Animated.View
         style={[
           styles.ambience,

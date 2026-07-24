@@ -10,4 +10,6 @@ export {
 export { FloatingScorePopup } from './FloatingScorePopup';
 export { PauseModal } from './PauseModal';
 export { TutorialOverlay } from './TutorialOverlay';
+export { PowerUpTray } from './PowerUpTray';
+export { WildValuePicker } from './WildValuePicker';
 export type { TutorialStep } from './TutorialOverlay';

@@ -21,6 +21,8 @@ type Props = {
   disabled?: boolean;
   selected?: boolean;
   swapSelected?: boolean;
+  reducedMotion?: boolean;
+  bombHighlight?: boolean;
 };
 
 export function LaneCard({
@@ -30,12 +32,14 @@ export function LaneCard({
   disabled = false,
   selected = false,
   swapSelected = false,
+  reducedMotion = false,
+  bombHighlight = false,
 }: Props) {
   const shake = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (lane.status !== 'bust') {
+    if (lane.status !== 'bust' || reducedMotion) {
       shake.setValue(0);
       return;
     }
@@ -46,10 +50,13 @@ export function LaneCard({
       Animated.timing(shake, { toValue: 4, duration: 50, useNativeDriver: USE_NATIVE_DRIVER }),
       Animated.timing(shake, { toValue: 0, duration: 50, useNativeDriver: USE_NATIVE_DRIVER }),
     ]).start();
-  }, [lane.status, shake]);
+  }, [lane.status, shake, reducedMotion]);
 
   useEffect(() => {
-    if (lane.status !== 'perfect' && lane.status !== 'receiving') {
+    if (
+      reducedMotion ||
+      (lane.status !== 'perfect' && lane.status !== 'receiving')
+    ) {
       pulse.setValue(1);
       return;
     }
@@ -69,9 +76,11 @@ export function LaneCard({
     );
     loop.start();
     return () => loop.stop();
-  }, [lane.status, pulse]);
+  }, [lane.status, pulse, reducedMotion]);
 
-  const border = borderColor(lane, selected, swapSelected);
+  const border = bombHighlight
+    ? colors.red
+    : borderColor(lane, selected, swapSelected);
   const totalColor = totalTextColor(lane);
   const progressColor = progressBarColor(lane);
   const pct = Math.min((lane.total / target) * 100, 100);
@@ -80,7 +89,8 @@ export function LaneCard({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Lane ${lane.id}`}
+      accessibilityLabel={`Lane ${lane.id}, total ${lane.total}, needs ${need} to reach ${target}`}
+      accessibilityState={{ disabled, selected: selected || swapSelected }}
       disabled={disabled}
       onPress={onPress}
       style={{ flex: 1, minWidth: 0 }}
@@ -95,7 +105,7 @@ export function LaneCard({
               { scale: selected || swapSelected ? 1.04 : pulse },
             ],
           },
-          neonGlow(border, lane.status === 'perfect' || lane.status === 'bust' ? 14 : 6),
+          neonGlow(border, lane.status === 'perfect' || lane.status === 'bust' || bombHighlight ? 14 : 6),
         ]}
       >
         {lane.status === 'frozen' ? (
