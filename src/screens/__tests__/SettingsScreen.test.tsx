@@ -2,6 +2,44 @@ import React from 'react';
 import { SettingsScreen } from '../SettingsScreen';
 import { renderWithProviders } from '../../test/renderWithProviders';
 
+jest.mock('../../hooks/useConsent', () => ({
+  useConsent: () => ({
+    consentStatus: 'notRequired',
+    canRequestAds: true,
+    isConsentFormAvailable: false,
+    trackingStatus: 'not-determined',
+    lastError: null,
+    refresh: jest.fn(),
+    requestTrackingIfNeeded: jest.fn(),
+    presentPrivacyOptions: jest.fn(async () => false),
+  }),
+}));
+
+jest.mock('../../hooks/useAds', () => ({
+  useAds: () => ({
+    adsAvailable: false,
+    rewardedState: 'unavailable',
+    interstitialState: 'unavailable',
+    showRewarded: jest.fn(),
+    showInterstitial: jest.fn(),
+    preloadRewarded: jest.fn(),
+    preloadInterstitial: jest.fn(),
+  }),
+}));
+
+jest.mock('../../hooks/usePurchases', () => ({
+  usePurchases: () => ({
+    purchasesAvailable: false,
+    purchaseState: 'unavailable',
+    offerings: [],
+    entitlements: { removeAds: false, clubActive: false, clubExpirationDate: null },
+    monetizationTestMode: true,
+    purchasePackage: jest.fn(),
+    restorePurchases: jest.fn(async () => ({ ok: false, error: 'mock' })),
+    refreshOfferings: jest.fn(),
+  }),
+}));
+
 describe('SettingsScreen', () => {
   const navigation = {
     navigate: jest.fn(),

@@ -28,8 +28,17 @@
 
 Prior Expo/RN packages unchanged (fonts, audio, haptics, navigation, AsyncStorage, etc.).
 
-## Explicitly not present
+## Explicitly not present (guest / default build)
 
-- Ads / IAP / push SDKs
+- Monetization SDKs (AdMob, RevenueCat) in production configuration
 - Service-role key in client
 - Chat / friends / KYC / geolocation SDKs
+
+## Optional monetization (when configured)
+
+| Component | Data | Notes |
+|-----------|------|-------|
+| AdMob SSV | Ad unit, transaction id, reward metadata, Supabase user id | Server callback only; test until verified |
+| RevenueCat | Store transaction ids, product ids, app user id (Supabase UUID) | Webhook fulfillment; no PAN stored in Supabase |
+| `monetization_entitlements` | remove_ads, club flags, starter bundle | Synced for signed-in users |
+| `purchase_transactions` / `ad_reward_transactions` | Purchase/ad ledgers | SELECT own via RLS |

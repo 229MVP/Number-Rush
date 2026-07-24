@@ -22,6 +22,7 @@ import { MagicLinkSentScreen } from '../screens/auth/MagicLinkSentScreen';
 import { AccountScreen } from '../screens/auth/AccountScreen';
 import { CloudSyncScreen } from '../screens/auth/CloudSyncScreen';
 import { AuthCallbackScreen } from '../screens/auth/AuthCallbackScreen';
+import { ReportAdScreen } from '../screens/ReportAdScreen';
 import { SyncConflictScreen } from '../screens/SyncConflictScreen';
 import { colors } from '../theme';
 import type { RootStackParamList } from './navigationTypes';
@@ -70,6 +71,7 @@ export function AppNavigator() {
         <Stack.Screen name="Shop" component={ShopScreen} />
         <Stack.Screen name="PowerUps" component={PowerUpsScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="ReportAd" component={ReportAdScreen} />
         <Stack.Screen name="BetaFeedback" component={BetaFeedbackScreen} />
         <Stack.Screen name="LegalInfo" component={LegalInfoScreen} />
         <Stack.Screen name="Missions" component={MissionsScreen} />

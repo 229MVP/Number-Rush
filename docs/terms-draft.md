@@ -14,8 +14,8 @@ Number Rush is a single-player number puzzle game. You may play as a **Guest** w
 - Classic Rush is always available offline.
 - Official Daily and Ranked live competition require authentication and a configured backend.
 - Practice Daily remains local.
-- There are **no advertisements**, **no real-money purchases**, and **no cash prizes** in this phase.
-- Virtual coins, gems, power-ups, and themes have **no real-world cash value**.
+- **Rewarded ads and in-app purchases** may be offered when enabled by the publisher; until AdMob/RevenueCat and store products are configured, the app ships in **test/off mode** with no ads and no real-money checkout.
+- Virtual coins, gems, power-ups, and themes have **no real-world cash value**; paid purchases are processed by the platform store.
 
 ## 3. Accounts
 

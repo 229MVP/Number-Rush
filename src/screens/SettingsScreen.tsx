@@ -22,6 +22,9 @@ import { useHaptics } from '../haptics/HapticsProvider';
 import { useSettings } from '../settings/SettingsProvider';
 import { useAuth } from '../hooks/useAuth';
 import { useCloudSync } from '../hooks/useCloudSync';
+import { useConsent } from '../hooks/useConsent';
+import { useAds } from '../hooks/useAds';
+import { usePurchases } from '../hooks/usePurchases';
 import { useOptionalGameTheme } from '../themes/GameThemeProvider';
 import { resetAllDailyData } from '../storage/dailyStorage';
 import { resetPlayerProgression } from '../storage/playerStorage';
@@ -115,6 +118,9 @@ export function SettingsScreen({ navigation }: Props) {
   const themeCtx = useOptionalGameTheme();
   const { isAuthenticated, isGuest, authStatus } = useAuth();
   const { status: syncStatus, enabled: syncEnabled } = useCloudSync();
+  const consent = useConsent();
+  const ads = useAds();
+  const purchases = usePurchases();
 
   const [resetText, setResetText] = useState('');
   const [resetModalVisible, setResetModalVisible] = useState(false);
@@ -341,6 +347,67 @@ export function SettingsScreen({ navigation }: Props) {
         <SectionHeader label="PREFERENCES" />
         <View style={styles.section}>
           <InfoRow label="Language" value="English" />
+        </View>
+
+        {/* ─── PRIVACY AND ADS ─── */}
+        <SectionHeader label="PRIVACY AND ADS" />
+        <View style={styles.section}>
+          <InfoRow label="Consent status" value={consent.consentStatus} />
+          <InfoRow
+            label="Can request ads"
+            value={consent.canRequestAds ? 'Yes' : 'No'}
+          />
+          <ChevronRow
+            label="Privacy choices"
+            onPress={() => {
+              tap();
+              void consent.presentPrivacyOptions().then((shown) => {
+                if (!shown) {
+                  Alert.alert(
+                    'Privacy choices',
+                    'Privacy options are not available on this device.',
+                  );
+                }
+              });
+            }}
+          />
+          <ChevronRow
+            label="Report ad"
+            testID="settings-report-ad"
+            onPress={() => {
+              tap();
+              navigation.navigate('ReportAd');
+            }}
+          />
+        </View>
+
+        {/* ─── ADS ─── */}
+        <SectionHeader label="ADS" />
+        <View style={styles.section}>
+          <InfoRow
+            label="Ads available"
+            value={ads.adsAvailable ? 'Yes' : 'No'}
+          />
+          <InfoRow
+            label="Remove Ads"
+            value={purchases.entitlements.removeAds ? 'Active' : 'Not owned'}
+          />
+          <NeonButton
+            label="RESTORE PURCHASES"
+            color={colors.electricBlue}
+            size="small"
+            onPress={() => {
+              tap();
+              void purchases.restorePurchases().then((result) => {
+                Alert.alert(
+                  result.ok ? 'Restored' : 'Restore failed',
+                  result.ok
+                    ? 'Purchase entitlements refreshed.'
+                    : result.error,
+                );
+              });
+            }}
+          />
         </View>
 
         {/* ─── BETA INFO ─── */}

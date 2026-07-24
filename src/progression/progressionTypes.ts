@@ -44,7 +44,8 @@ export type EconomyTransactionType =
   | 'shop_purchase'
   | 'theme_unlock'
   | 'level_reward'
-  | 'development_adjustment';
+  | 'development_adjustment'
+  | 'rewarded_ad_bonus';
 
 export type EconomyTransaction = {
   id: string;

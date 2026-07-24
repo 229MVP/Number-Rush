@@ -26,7 +26,31 @@ export type AnalyticsEventName =
   | 'sync_completed'
   | 'sync_failed'
   | 'submission_sent'
-  | 'submission_queued';
+  | 'submission_queued'
+  | 'consent_gather_completed'
+  | 'att_status_updated'
+  | 'ad_init_started'
+  | 'ad_init_completed'
+  | 'ad_init_failed'
+  | 'ad_request'
+  | 'ad_loaded'
+  | 'ad_load_failed'
+  | 'ad_show_requested'
+  | 'ad_show_started'
+  | 'ad_show_completed'
+  | 'ad_show_failed'
+  | 'ad_reward_earned'
+  | 'ad_impression'
+  | 'interstitial_eligibility_checked'
+  | 'purchase_init_started'
+  | 'purchase_init_completed'
+  | 'purchase_init_failed'
+  | 'purchase_started'
+  | 'purchase_completed'
+  | 'purchase_failed'
+  | 'purchase_restored'
+  | 'purchase_restore_failed'
+  | 'entitlements_updated';
 
 export type AnalyticsPayload = Record<string, string | number | boolean | null>;
 
