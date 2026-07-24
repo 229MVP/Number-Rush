@@ -9,6 +9,7 @@ type Props = {
   style?: ViewStyle;
   size?: number;
   accessibilityLabel?: string;
+  testID?: string;
 };
 
 export function NeonIconButton({
@@ -18,10 +19,12 @@ export function NeonIconButton({
   style,
   size = 44,
   accessibilityLabel,
+  testID,
 }: Props) {
   const dim = Math.max(44, size);
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       hitSlop={8}

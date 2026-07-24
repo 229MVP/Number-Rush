@@ -84,7 +84,7 @@ export function GameOverScreen({ navigation, route }: Props) {
   ];
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]} testID="game-over-screen">
       <View style={[styles.decorLayer, { pointerEvents: 'none' }]}>
         <GridBackground opacity={0.05} />
         <View style={styles.redGlow} />
@@ -140,6 +140,7 @@ export function GameOverScreen({ navigation, route }: Props) {
 
         <View style={styles.actions}>
           <NeonButton
+            testID="play-again"
             label="PLAY AGAIN"
             color={colors.neonPink}
             size="large"
@@ -149,6 +150,7 @@ export function GameOverScreen({ navigation, route }: Props) {
             }
           />
           <NeonButton
+            testID="return-main-menu"
             label="MAIN MENU"
             color={colors.electricBlue}
             icon={<Home size={15} color={colors.white} />}

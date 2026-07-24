@@ -14,6 +14,8 @@ import { LeaderboardScreen } from '../screens/LeaderboardScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { PowerUpsScreen } from '../screens/PowerUpsScreen';
 import { DailyResultsScreen } from '../screens/DailyResultsScreen';
+import { BetaFeedbackScreen } from '../screens/BetaFeedbackScreen';
+import { LegalInfoScreen } from '../screens/LegalInfoScreen';
 import { colors } from '../theme';
 import type { RootStackParamList } from './navigationTypes';
 
@@ -52,6 +54,8 @@ export function AppNavigator() {
         <Stack.Screen name="Shop" component={ShopScreen} />
         <Stack.Screen name="PowerUps" component={PowerUpsScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="BetaFeedback" component={BetaFeedbackScreen} />
+        <Stack.Screen name="LegalInfo" component={LegalInfoScreen} />
         <Stack.Screen name="Missions" component={MissionsScreen} />
         <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />

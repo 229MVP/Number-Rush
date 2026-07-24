@@ -15,6 +15,7 @@ type Props = {
   showEffective?: boolean;
   measureRef?: React.Ref<View>;
   onCardLayout?: () => void;
+  testID?: string;
 };
 
 function NumberTileComponent({
@@ -26,6 +27,7 @@ function NumberTileComponent({
   showEffective = false,
   measureRef,
   onCardLayout,
+  testID,
 }: Props) {
   const isCurrent = variant === 'current' || variant === 'travel';
   const displayValue = wildValue != null ? wildValue : tile.value;
@@ -49,6 +51,7 @@ function NumberTileComponent({
 
   return (
     <View
+      testID={testID}
       style={styles.col}
       accessible
       accessibilityLabel={a11yLabel}

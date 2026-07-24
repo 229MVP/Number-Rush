@@ -90,8 +90,9 @@ export function GameplayHUD({
           ) : null}
         </View>
       )}
-      <View style={styles.hud}>
+      <View style={styles.hud} testID="gameplay-hud">
       <Pressable
+        testID="gameplay-pause"
         accessibilityRole="button"
         accessibilityLabel="Pause game"
         accessibilityState={{ disabled: pauseDisabled }}

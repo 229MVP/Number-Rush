@@ -8,15 +8,17 @@ type Props = {
   /** Attached to the TARGET panel card for tutorial measurement. */
   measureRef?: React.Ref<View>;
   onPanelLayout?: () => void;
+  testID?: string;
 };
 
 export function TargetPanel({
   target = TARGET_VALUE,
   measureRef,
   onPanelLayout,
+  testID = 'target-panel',
 }: Props) {
   return (
-    <View style={styles.wrap}>
+    <View style={styles.wrap} testID={testID}>
       <View
         ref={measureRef}
         collapsable={false}

@@ -42,15 +42,17 @@ function ToggleRow({
   onToggle,
   accent = ACCENT,
   disabled = false,
+  testID,
 }: {
   label: string;
   value: boolean;
   onToggle: () => void;
   accent?: string;
   disabled?: boolean;
+  testID?: string;
 }) {
   return (
-    <View style={[styles.row, disabled && styles.rowDisabled]}>
+    <View style={[styles.row, disabled && styles.rowDisabled]} testID={testID}>
       <Text style={styles.rowLabel}>{label}</Text>
       <Switch
         value={value}
@@ -79,12 +81,14 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 function ChevronRow({
   label,
   onPress,
+  testID,
 }: {
   label: string;
   onPress: () => void;
+  testID?: string;
 }) {
   return (
-    <Pressable style={styles.row} onPress={onPress} hitSlop={6}>
+    <Pressable testID={testID} style={styles.row} onPress={onPress} hitSlop={6}>
       <Text style={styles.rowLabel}>{label}</Text>
       <Text style={styles.chevron}>›</Text>
     </Pressable>
@@ -214,7 +218,7 @@ export function SettingsScreen({ navigation }: Props) {
   const confirmed = resetText.trim() === 'RESET';
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: insets.top }]} testID="screen-settings">
       <View style={[styles.decor, { pointerEvents: 'none' }]}>
         <GridBackground opacity={0.04} />
         <AnimatedNeonBackground intensity="menu" />
@@ -302,6 +306,7 @@ export function SettingsScreen({ navigation }: Props) {
             value={settings.reducedMotion}
             onToggle={() => { void handleReducedMotionToggle(); }}
             accent={colors.yellow}
+            testID="settings-reduced-motion"
           />
           <ToggleRow
             label="High Contrast"
@@ -332,18 +337,43 @@ export function SettingsScreen({ navigation }: Props) {
         <SectionHeader label="PREFERENCES" />
         <View style={styles.section}>
           <InfoRow label="Language" value="English" />
+        </View>
+
+        {/* ─── BETA INFO ─── */}
+        <SectionHeader label="BETA INFORMATION" />
+        <View style={styles.section}>
+          <Text style={styles.disclosure}>
+            Number Rush beta stores progress only on this device. There is no
+            account or cloud backup yet — clearing app data removes progress.
+          </Text>
+          <Text style={styles.disclosure}>
+            Daily and Ranked leaderboards are local / Coming Soon previews, not
+            live online competition. Preview reward and balance values may change.
+          </Text>
           <ChevronRow
-            label="Privacy"
+            label="Legal (DRAFT)"
             onPress={() => {
               tap();
-              Alert.alert('Privacy', 'Privacy policy will be available in a future update.');
+              navigation.navigate('LegalInfo', { section: 'privacy' });
             }}
+            testID="settings-legal"
+          />
+          <ChevronRow
+            label="Beta Feedback"
+            onPress={() => {
+              tap();
+              navigation.navigate('BetaFeedback');
+            }}
+            testID="settings-beta-feedback"
           />
           <ChevronRow
             label="Support"
             onPress={() => {
               tap();
-              Alert.alert('Support', 'Support options will be available in a future update.');
+              Alert.alert(
+                'Support',
+                'Use Beta Feedback in Settings to share a local report. Hosted support contact coming later.',
+              );
             }}
           />
         </View>
@@ -358,6 +388,7 @@ export function SettingsScreen({ navigation }: Props) {
             onPress={handleRestoreDefaults}
           />
           <NeonButton
+            testID="settings-reset-all"
             label="RESET ALL LOCAL PROGRESS"
             color={colors.red}
             size="small"
@@ -392,6 +423,7 @@ export function SettingsScreen({ navigation }: Props) {
               {' '}to permanently delete all local progress.
             </Text>
             <TextInput
+              testID="settings-reset-confirm-input"
               style={[
                 styles.resetInput,
                 confirmed && { borderColor: colors.red, color: colors.red },
@@ -449,6 +481,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: withAlpha(ACCENT, 0.18),
     overflow: 'hidden',
+  },
+
+  disclosure: {
+    fontFamily: fontFamilies.rajdhaniSemiBold,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.muted,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
 
   row: {

@@ -1,0 +1,35 @@
+# Manual Maestro E2E stub for Number Rush (Expo SDK 57).
+# Do not auto-publish OTA or store builds from this workflow.
+# BLOCKED until android.package / ios.bundleIdentifier are assigned and
+# eas.json e2e-test binaries can be produced.
+
+name: e2e-tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "android | ios"
+        required: true
+        type: choice
+        default: android
+        options:
+          - android
+          - ios
+
+jobs:
+  maestro:
+    name: Maestro smoke (manual)
+    type: build
+    # Intentionally minimal stub — wire to EAS Workflow Maestro steps when appId exists.
+    params:
+      platform: ${{ inputs.platform }}
+      profile: e2e-test
+    steps:
+      - name: Reminder
+        run: |
+          echo "1) Assign android.package / ios.bundleIdentifier (blockers)."
+          echo "2) Update .maestro/*.yml appId."
+          echo "3) eas build --profile e2e-test --platform ${{ inputs.platform }}"
+          echo "4) maestro test .maestro/"
+          echo "Do NOT publish eas update from this workflow."

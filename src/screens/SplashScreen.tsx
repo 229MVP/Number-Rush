@@ -55,7 +55,7 @@ export function SplashScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={styles.root} testID="splash-screen">
       {/* Decorative layers — never receive touches */}
       <View style={[styles.decorLayer, { pointerEvents: 'none' }]}>
         <View style={styles.glowBlob} />
@@ -133,6 +133,7 @@ export function SplashScreen({ navigation }: Props) {
 
       {/* Full-screen interaction layer on top of visuals */}
       <Pressable
+        testID="splash-start"
         accessibilityRole="button"
         accessibilityLabel="Tap to start"
         onPress={start}
