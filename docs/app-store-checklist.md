@@ -28,12 +28,13 @@
 |------|--------|
 | Nutrition labels | Verify after binary — see `ios-privacy-review.md` |
 | `expo-audio` / `expo-haptics` | Inspect generated Info.plist; do not invent usage strings |
-| Tracking | No ATT expected (no ads / tracking SDK) |
+| Tracking | ATT string present via AdMob/ATT plugins — request only when personalized ads require it; legal review required |
+| Advertising / IAP | AdMob + RevenueCat integrated in **test/sandbox posture**; declare ads & purchases accurately at submit time |
 | In-app Legal DRAFT | `LegalInfoScreen` — replace with hosted Terms/Privacy |
 
 ## Review notes (draft)
 
-Number Rush is a local single-player puzzle game. Ranked and Leaderboard screens display Coming Soon. There are no accounts, no chat, no IAP, and no ads in this beta.
+Number Rush is a neon number puzzle with Classic, Daily Tournament, and Ranked modes. Soft-currency progression and an optional Shop remain available without payment. When monetization is enabled for a build: rewarded ads are optional; interstitial ads follow a limited Classic-only policy; Remove Ads and gem packs are one-time / consumable store products. Number Rush Club is not launched. No cash prizes. Competitive modes do not sell score advantages.
 
 ## QA on TestFlight
 

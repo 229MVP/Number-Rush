@@ -1,3 +1,8 @@
+import { getAppEnvironment } from './environment';
+import {
+  isAdsConfigReady,
+  isPurchasesConfigReady,
+} from './monetizationEnvironment';
 import { isSupabaseConfigured } from './supabaseEnvironment';
 
 function parseFeatureOverride(
@@ -14,6 +19,69 @@ function resolveFeature(envName: string): boolean {
   if (override != null) return override;
   return isSupabaseConfigured();
 }
+
+function isDevLikeEnvironment(): boolean {
+  if (__DEV__) return true;
+  const env = getAppEnvironment();
+  return env === 'development' || env === 'preview';
+}
+
+function resolveMonetizationToggle(
+  envName: string,
+  devDefault: boolean,
+  productionRequiresReady: () => boolean,
+): boolean {
+  const override = parseFeatureOverride(envName);
+  if (isDevLikeEnvironment()) {
+    if (override != null) return override;
+    return devDefault;
+  }
+  if (override === true && productionRequiresReady()) return true;
+  return false;
+}
+
+function childAdsFlag(devDefault: boolean): boolean {
+  if (!adsEnabled) return false;
+  if (isDevLikeEnvironment()) return devDefault;
+  return adsEnabled;
+}
+
+/** Master ads switch (test ads in dev-like builds when true). */
+export const adsEnabled = resolveMonetizationToggle(
+  'EXPO_PUBLIC_ADS_ENABLED',
+  true,
+  isAdsConfigReady,
+);
+
+export const rewardedAdsEnabled = childAdsFlag(true);
+
+export const interstitialAdsEnabled = childAdsFlag(true);
+
+export const purchasesEnabled = resolveMonetizationToggle(
+  'EXPO_PUBLIC_PURCHASES_ENABLED',
+  true,
+  isPurchasesConfigReady,
+);
+
+export const subscriptionsEnabled =
+  purchasesEnabled &&
+  resolveMonetizationToggle(
+    'EXPO_PUBLIC_SUBSCRIPTIONS_ENABLED',
+    false,
+    isPurchasesConfigReady,
+  );
+
+export const rewardedAdSsvEnabled =
+  !isDevLikeEnvironment() &&
+  parseFeatureOverride('EXPO_PUBLIC_REWARDED_AD_SSV_ENABLED') === true;
+
+export const personalizedAdsEnabled = isDevLikeEnvironment()
+  ? parseFeatureOverride('EXPO_PUBLIC_PERSONALIZED_ADS_ENABLED') !== false
+  : parseFeatureOverride('EXPO_PUBLIC_PERSONALIZED_ADS_ENABLED') === true;
+
+export const removeAdsProductEnabled = purchasesEnabled;
+
+export const starterBundleEnabled = purchasesEnabled;
 
 /** Cloud save / sync when Supabase is configured unless forced off. */
 export const cloudSyncEnabled = resolveFeature(

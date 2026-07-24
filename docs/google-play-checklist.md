@@ -28,10 +28,11 @@
 |------|-------|
 | Listing copy | Use `store-listing.md` — no fake multiplayer/cash |
 | Ranked / Leaderboard | Disclose Coming Soon if shown in screenshots |
-| Ads declaration | No ads SDK |
-| IAP / Paid features | No billing SDK; soft currency local only |
+| Ads declaration | AdMob present — declare ads; current builds use **test IDs** until production units are configured |
+| IAP / Paid features | RevenueCat present — declare in-app products when activated; Club subscription not launched |
 | Target API / policies | Follow current Play target API when building |
-| Families / Designed for families | Not configured — default general audience |
+| Families / Designed for families | Not configured — default general audience; review ads/IAP age policies before Families |
+| AD_ID permission | Added by Google Mobile Ads plugin — disclose in Data safety |
 
 ## QA before closed testing
 

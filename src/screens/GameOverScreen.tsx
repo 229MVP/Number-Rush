@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -9,9 +9,25 @@ import { NeonButton } from '../components/NeonButton';
 import { PerspectiveGrid } from '../components/PerspectiveGrid';
 import { RewardSummaryCard } from '../components/RewardSummaryCard';
 import { useOptionalAudio } from '../audio/AudioProvider';
+import { evaluateInterstitialEligibility } from '../ads/interstitialPolicy';
+import { interstitialAdsEnabled, rewardedAdsEnabled } from '../config/featureFlags';
+import { useAds } from '../hooks/useAds';
+import { usePurchases } from '../hooks/usePurchases';
+import { useConsent } from '../hooks/useConsent';
 import type { RootStackParamList } from '../navigation/navigationTypes';
 import type { AppliedRunReward } from '../progression/progressionTypes';
 import { applyRunRewardsOnce } from '../progression/applyRunRewards';
+import {
+  applyEconomyTransaction,
+  createTransactionId,
+} from '../storage/playerStorage';
+import {
+  hasDoubleCoinsClaimed,
+  markDoubleCoinsClaimed,
+  readAdFrequencyState,
+  recordClassicRunComplete,
+  recordInterstitialShown,
+} from '../storage/adFrequencyStorage';
 import { colors, fontFamilies, neonGlow, radii, spacing, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GameOver'>;
@@ -19,6 +35,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'GameOver'>;
 export function GameOverScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const audio = useOptionalAudio();
+  const ads = useAds();
+  const { entitlements } = usePurchases();
+  const { canRequestAds } = useConsent();
 
   useEffect(() => {
     void audio?.playMusic('results');
@@ -39,7 +58,17 @@ export function GameOverScreen({ navigation, route }: Props) {
 
   const [reward, setReward] = useState<AppliedRunReward | null>(null);
   const [loadingReward, setLoadingReward] = useState(true);
+  const [doubleBusy, setDoubleBusy] = useState(false);
+  const [doubleClaimed, setDoubleClaimed] = useState(false);
+  const [navBusy, setNavBusy] = useState(false);
   const appliedRef = useRef(false);
+  const classicRunRecordedRef = useRef(false);
+
+  useEffect(() => {
+    if (classicRunRecordedRef.current) return;
+    classicRunRecordedRef.current = true;
+    void recordClassicRunComplete();
+  }, []);
 
   useEffect(() => {
     if (appliedRef.current) return;
@@ -59,6 +88,10 @@ export function GameOverScreen({ navigation, route }: Props) {
           swapsUsed,
         });
         if (!cancelled) setReward(result);
+        const freq = await readAdFrequencyState();
+        if (!cancelled) {
+          setDoubleClaimed(hasDoubleCoinsClaimed(freq, rewardKey));
+        }
       } finally {
         if (!cancelled) setLoadingReward(false);
       }
@@ -76,6 +109,83 @@ export function GameOverScreen({ navigation, route }: Props) {
     multipliersUsed,
     swapsUsed,
   ]);
+
+  const showDoubleCoins =
+    rewardedAdsEnabled &&
+    ads.adsAvailable &&
+    !doubleClaimed &&
+    reward != null &&
+    reward.reward.coins > 0;
+
+  const watchDoubleCoins = () => {
+    if (doubleBusy || !reward) return;
+    setDoubleBusy(true);
+    void (async () => {
+      try {
+        const result = await ads.showRewarded({
+          placement: 'double_classic_coins',
+          opportunityId: rewardKey,
+        });
+        if (!result.earned) return;
+        const bonusCoins = reward.reward.coins;
+        await applyEconomyTransaction({
+          id: createTransactionId(`double-coins-${rewardKey}`),
+          type: 'rewarded_ad_bonus',
+          coinsDelta: bonusCoins,
+          gemsDelta: 0,
+          source: 'double_coins_ad',
+          createdAt: new Date().toISOString(),
+        });
+        await markDoubleCoinsClaimed(rewardKey);
+        setDoubleClaimed(true);
+        setReward((prev) =>
+          prev
+            ? {
+                ...prev,
+                reward: {
+                  ...prev.reward,
+                  coins: prev.reward.coins + bonusCoins,
+                },
+              }
+            : prev,
+        );
+        audio?.playSound('reward');
+      } finally {
+        setDoubleBusy(false);
+      }
+    })();
+  };
+
+  const navigateAfterInterstitial = useCallback(
+    (action: () => void) => {
+      if (navBusy) return;
+      setNavBusy(true);
+      void (async () => {
+        try {
+          const nowMs = Date.now();
+          const frequency = await readAdFrequencyState();
+          const eligibility = evaluateInterstitialEligibility({
+            nowMs,
+            frequency,
+            entitlements,
+            interstitialAdsEnabled,
+            canRequestAds,
+            modeIsClassic: true,
+          });
+          if (eligibility.eligible) {
+            const shown = await ads.showInterstitial('classic_run_complete');
+            if (shown.shown) {
+              await recordInterstitialShown(nowMs);
+            }
+          }
+        } finally {
+          setNavBusy(false);
+          action();
+        }
+      })();
+    },
+    [ads, canRequestAds, entitlements, navBusy],
+  );
 
   const stats = [
     { label: 'MAX COMBO', value: `x${maxComboMultiplier}`, color: colors.cyan },
@@ -138,6 +248,17 @@ export function GameOverScreen({ navigation, route }: Props) {
 
         <RewardSummaryCard result={reward} loading={loadingReward} />
 
+        {showDoubleCoins ? (
+          <NeonButton
+            testID="double-coins-ad"
+            label={doubleBusy ? 'LOADING AD…' : 'DOUBLE COINS'}
+            color={colors.yellow}
+            size="large"
+            disabled={doubleBusy}
+            onPress={watchDoubleCoins}
+          />
+        ) : null}
+
         <View style={styles.actions}>
           <NeonButton
             testID="play-again"
@@ -145,8 +266,11 @@ export function GameOverScreen({ navigation, route }: Props) {
             color={colors.neonPink}
             size="large"
             icon={<RotateCcw size={17} color={colors.white} />}
+            disabled={navBusy}
             onPress={() =>
-              navigation.replace('Gameplay', { mode: 'classic' })
+              navigateAfterInterstitial(() =>
+                navigation.replace('Gameplay', { mode: 'classic' }),
+              )
             }
           />
           <NeonButton
@@ -154,7 +278,10 @@ export function GameOverScreen({ navigation, route }: Props) {
             label="MAIN MENU"
             color={colors.electricBlue}
             icon={<Home size={15} color={colors.white} />}
-            onPress={() => navigation.navigate('MainMenu')}
+            disabled={navBusy}
+            onPress={() =>
+              navigateAfterInterstitial(() => navigation.navigate('MainMenu'))
+            }
           />
         </View>
       </ScrollView>

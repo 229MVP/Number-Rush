@@ -38,10 +38,17 @@ Contact: [privacy@example.com — TODO]
 Live leaderboards may show: username, score / Ranked Points, limited run stats, relative rank.  
 They do **not** show email, currency balances, inventory, device IDs, or raw run event logs.
 
-### Not in this phase
+### Optional monetization (not enabled by default)
 
-- Advertising SDKs / Ad IDs for ads
-- Real-money payments
+When the publisher enables connected monetization:
+
+- **Rewarded ads (AdMob)** — ad network callbacks may include ad unit id, reward type/amount, and a server-issued opportunity id tied to your account.
+- **In-app purchases (RevenueCat)** — store transaction identifiers and product ids; payment cards are processed by Apple/Google, not stored in Number Rush backends.
+- **Entitlements** — e.g. ad removal or bundle claims stored in `monetization_entitlements`.
+
+Until store and SDK configuration is complete, the app runs without ads or real-money purchases.
+
+### Not collected in this phase
 - Contacts, precise location, microphone, camera
 - Social chat / friends graph
 

@@ -20,21 +20,24 @@ These modules are dependencies and **may** require privacy questionnaire answers
 |--------|------------|
 | `expo-audio` | Audio playback for music / SFX; confirm whether any mic / background audio modes appear in the built Info.plist |
 | `expo-haptics` | Haptic feedback; usually no special privacy key, confirm in binary |
-| AsyncStorage | Local data only — disclose “Data Not Linked to You” style answers only after confirming no analytics SDK |
+| `react-native-google-mobile-ads` | Advertising; ATT / tracking / advertising data labels; UMP consent |
+| `expo-tracking-transparency` | NSUserTrackingUsageDescription present when ATT used |
+| `react-native-purchases` | Purchase history / identifiers via RevenueCat + Apple/Google; no PAN stored by app |
+| AsyncStorage | Local cache — disclose accurately with cloud/auth present |
 
-**Rule:** Open the generated `Info.plist` from an EAS/`npx expo prebuild` iOS artifact and record **actual** keys. Do not copy guessed microphone / tracking reasons into the repo.
+**Rule:** Open the generated `Info.plist` from an EAS/`npx expo prebuild` iOS artifact and record **actual** keys. Do not invent microphone / contacts / location reasons.
 
-## App Privacy (Nutrition Labels) — draft posture for local-only beta
+## App Privacy (Nutrition Labels) — draft posture with monetization architecture
 
-Until a backend or analytics vendor is added, the intended posture is:
+When shipping a build that includes AdMob / RevenueCat / accounts:
 
-- **No Account Data**
-- **No Location**
-- **No Advertising Data**
-- **Product Interaction / Gameplay** — if you choose to declare on-device progress; otherwise “Data Not Collected” only if accurate for the binary you ship
+- **Purchases** — declare as applicable (Apple/Google process payment)
+- **Advertising Data** — declare when ads are enabled; distinguish personalized vs non-personalized based on consent/ATT
+- **Identifiers** — device / purchase / user IDs as used for auth, SSV, and RevenueCat app user id (Supabase UUID — not email)
+- **Product Interaction / Gameplay** — progress, scores
 - **Diagnostics** — only if a crash/analytics SDK is actually linked
 
-Re-answer labels when Ranked / online leaderboards / accounts ship.
+Until production ads/IAP are confirmed, review labels against the **exact binary** shipped (test ads still use AdMob SDK).
 
 ## TestFlight verification checklist
 

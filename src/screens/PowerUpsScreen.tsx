@@ -15,11 +15,20 @@ import { GridBackground } from '../components/GridBackground';
 import { NeonButton } from '../components/NeonButton';
 import { ScreenTopBar } from '../components/ScreenTopBar';
 import type { RootStackParamList } from '../navigation/navigationTypes';
+import { rewardedAdsEnabled } from '../config/featureFlags';
+import { useAds } from '../hooks/useAds';
 import type { PlayerInventory, PlayerProfile } from '../progression/progressionTypes';
 import {
+  applyEconomyTransaction,
+  createTransactionId,
   getPlayerInventory,
   getPlayerProfile,
 } from '../storage/playerStorage';
+import {
+  canClaimDailyFreePowerup,
+  claimDailyFreePowerup,
+  readAdFrequencyState,
+} from '../storage/adFrequencyStorage';
 import { colors, fontFamilies, neonGlow, radii, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PowerUps'>;
@@ -86,6 +95,16 @@ const ROWS: PowerRow[] = [
   },
 ];
 
+type FreePowerKey = 'multiplier' | 'swap' | 'bomb' | 'freeze' | 'shield';
+
+const FREE_POWER_OPTIONS: Array<{ key: FreePowerKey; label: string }> = [
+  { key: 'multiplier', label: 'MULTI' },
+  { key: 'swap', label: 'SWAP' },
+  { key: 'bomb', label: 'BOMB' },
+  { key: 'freeze', label: 'FREEZE' },
+  { key: 'shield', label: 'SHIELD' },
+];
+
 const LABEL_COLORS: Record<AvailLabel, string> = {
   'USABLE IN CLASSIC': colors.green,
   'DISABLED IN DAILY': colors.muted,
@@ -108,16 +127,23 @@ function RowIcon({ icon, color }: { icon: PowerRow['icon']; color: string }) {
 
 export function PowerUpsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const ads = useAds();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [inventory, setInventory] = useState<PlayerInventory | null>(null);
+  const [freePower, setFreePower] = useState<FreePowerKey>('multiplier');
+  const [freeAvailable, setFreeAvailable] = useState(false);
+  const [freeBusy, setFreeBusy] = useState(false);
+  const [freeMessage, setFreeMessage] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [p, inv] = await Promise.all([
+    const [p, inv, freq] = await Promise.all([
       getPlayerProfile(),
       getPlayerInventory(),
+      readAdFrequencyState(),
     ]);
     setProfile(p);
     setInventory(inv);
+    setFreeAvailable(canClaimDailyFreePowerup(freq));
   }, []);
 
   useFocusEffect(
@@ -125,6 +151,42 @@ export function PowerUpsScreen({ navigation }: Props) {
       void refresh();
     }, [refresh]),
   );
+
+  const claimFreePowerup = () => {
+    if (freeBusy || !freeAvailable || !rewardedAdsEnabled || !ads.adsAvailable) {
+      return;
+    }
+    setFreeBusy(true);
+    setFreeMessage(null);
+    void (async () => {
+      try {
+        const result = await ads.showRewarded({
+          placement: 'daily_free_powerup',
+          opportunityId: `daily-${freePower}`,
+        });
+        if (!result.earned) return;
+        const claimed = await claimDailyFreePowerup();
+        if (!claimed) {
+          setFreeMessage('Already claimed today');
+          return;
+        }
+        await applyEconomyTransaction({
+          id: createTransactionId(`daily-free-${freePower}`),
+          type: 'shop_purchase',
+          coinsDelta: 0,
+          gemsDelta: 0,
+          inventoryChanges: { [freePower]: 1 },
+          source: 'daily_free_powerup_ad',
+          createdAt: new Date().toISOString(),
+        });
+        setFreeMessage(`+1 ${freePower.toUpperCase()} added`);
+        setFreeAvailable(false);
+        await refresh();
+      } finally {
+        setFreeBusy(false);
+      }
+    })();
+  };
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -152,6 +214,49 @@ export function PowerUpsScreen({ navigation }: Props) {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
+        {rewardedAdsEnabled ? (
+          <View style={[styles.freeCard, neonGlow(colors.cyan, 6)]}>
+            <Text style={styles.freeTitle}>FREE POWER-UP</Text>
+            <Text style={styles.desc}>
+              Pick a power-up, watch an ad, and get +1 once per UTC day.
+            </Text>
+            <View style={styles.freeRow}>
+              {FREE_POWER_OPTIONS.map((opt) => {
+                const on = freePower === opt.key;
+                return (
+                  <Pressable
+                    key={opt.key}
+                    onPress={() => setFreePower(opt.key)}
+                    style={[styles.freeChip, on && styles.freeChipOn]}
+                  >
+                    <Text style={[styles.freeChipText, on && styles.freeChipTextOn]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <NeonButton
+              label={
+                freeBusy
+                  ? 'LOADING…'
+                  : freeAvailable
+                    ? 'WATCH AD & CLAIM'
+                    : 'CLAIMED TODAY'
+              }
+              color={colors.cyan}
+              size="small"
+              disabled={
+                freeBusy || !freeAvailable || !ads.adsAvailable
+              }
+              onPress={claimFreePowerup}
+            />
+            {freeMessage ? (
+              <Text style={styles.freeMsg}>{freeMessage}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
         {inventory
           ? ROWS.map((row) => {
               const qty = inventory[row.key];
@@ -226,6 +331,44 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   decor: { ...StyleSheet.absoluteFill },
   scroll: { padding: 16, gap: 10, paddingBottom: 28 },
+  freeCard: {
+    backgroundColor: colors.card,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    borderColor: withAlpha(colors.cyan, 0.35),
+    padding: 14,
+    gap: 10,
+  },
+  freeTitle: {
+    fontFamily: fontFamilies.orbitronBold,
+    fontSize: 12,
+    color: colors.cyan,
+    letterSpacing: 1,
+  },
+  freeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  freeChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: withAlpha(colors.cyan, 0.25),
+    backgroundColor: colors.card,
+  },
+  freeChipOn: {
+    borderColor: colors.cyan,
+    backgroundColor: withAlpha(colors.cyan, 0.12),
+  },
+  freeChipText: {
+    fontFamily: fontFamilies.rajdhaniBold,
+    fontSize: 10,
+    color: colors.muted,
+  },
+  freeChipTextOn: { color: colors.cyan },
+  freeMsg: {
+    fontFamily: fontFamilies.rajdhaniBold,
+    fontSize: 11,
+    color: colors.green,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
