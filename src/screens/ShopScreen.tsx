@@ -177,6 +177,7 @@ export function ShopScreen({ navigation }: Props) {
                     label={`${item.priceCurrency === 'gems' ? '◆' : '⬡'} ${item.price}`}
                     color={colors.orange}
                     size="small"
+                    fullWidth={false}
                     disabled={busyId === item.id}
                     onPress={() => buy(item)}
                   />
@@ -248,6 +249,7 @@ export function ShopScreen({ navigation }: Props) {
                       label="SELECT"
                       color={theme.colors.primary}
                       size="small"
+                      fullWidth={false}
                       onPress={() => {
                         void selectTheme(theme.id).then(() => refresh());
                       }}
@@ -257,6 +259,7 @@ export function ShopScreen({ navigation }: Props) {
                       label={`BUY ${shopItem.priceCurrency === 'gems' ? '◆' : '⬡'} ${shopItem.price}`}
                       color={theme.colors.primary}
                       size="small"
+                      fullWidth={false}
                       disabled={busyId === shopItem.id}
                       onPress={() => buy(shopItem)}
                     />
