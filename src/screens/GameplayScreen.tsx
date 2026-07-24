@@ -347,13 +347,16 @@ export function GameplayScreen({ navigation, route }: Props) {
   };
 
   const powerLocked = game.powerUpsEnabled ? null : 'DISABLED IN TOURNAMENT';
-  const modeBadge = game.mode === 'daily' ? 'DAILY' : null;
+  const modeBadge =
+    game.mode === 'daily' ? 'DAILY' : game.mode === 'ranked' ? 'RANKED' : null;
   const attemptLabel =
     game.mode === 'daily'
       ? game.officialAttempt
         ? 'OFFICIAL'
         : 'PRACTICE'
-      : null;
+      : game.mode === 'ranked'
+        ? 'MATCH'
+        : null;
 
   const lanePad = 10;
   const laneGap = 7;

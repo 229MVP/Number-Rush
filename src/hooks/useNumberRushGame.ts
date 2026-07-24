@@ -687,6 +687,8 @@ export function useNumberRushGame({
         await finishDaily(stats, reason, cfg);
         return;
       }
+      // Ranked uses Classic local reward path for now; server validation
+      // is queued separately when cloud features are configured.
       await finishClassic(stats);
     },
     [finishClassic, finishDaily],

@@ -15,7 +15,18 @@ export type AnalyticsEventName =
   | 'virtual_item_purchased'
   | 'theme_selected'
   | 'setting_changed'
-  | 'error_caught';
+  | 'error_caught'
+  | 'auth_magic_link_requested'
+  | 'auth_magic_link_sent'
+  | 'auth_session_restored'
+  | 'auth_signed_out'
+  | 'auth_guest_continued'
+  | 'auth_account_deleted'
+  | 'sync_domain_queued'
+  | 'sync_completed'
+  | 'sync_failed'
+  | 'submission_sent'
+  | 'submission_queued';
 
 export type AnalyticsPayload = Record<string, string | number | boolean | null>;
 

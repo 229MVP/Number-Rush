@@ -20,6 +20,8 @@ import { ScreenTopBar } from '../components/ScreenTopBar';
 import { useAudio } from '../audio/AudioProvider';
 import { useHaptics } from '../haptics/HapticsProvider';
 import { useSettings } from '../settings/SettingsProvider';
+import { useAuth } from '../hooks/useAuth';
+import { useCloudSync } from '../hooks/useCloudSync';
 import { useOptionalGameTheme } from '../themes/GameThemeProvider';
 import { resetAllDailyData } from '../storage/dailyStorage';
 import { resetPlayerProgression } from '../storage/playerStorage';
@@ -111,6 +113,8 @@ export function SettingsScreen({ navigation }: Props) {
   } = useAudio();
   const { hapticsEnabled, setHapticsEnabled, selection: hapticSelect } = useHaptics();
   const themeCtx = useOptionalGameTheme();
+  const { isAuthenticated, isGuest, authStatus } = useAuth();
+  const { status: syncStatus, enabled: syncEnabled } = useCloudSync();
 
   const [resetText, setResetText] = useState('');
   const [resetModalVisible, setResetModalVisible] = useState(false);
@@ -399,9 +403,52 @@ export function SettingsScreen({ navigation }: Props) {
         {/* ─── ACCOUNT ─── */}
         <SectionHeader label="ACCOUNT" />
         <View style={styles.section}>
-          <View style={[styles.comingCard, neonGlow(colors.electricBlue, 5)]}>
-            <Text style={styles.comingText}>ACCOUNTS COMING LATER</Text>
-          </View>
+          <InfoRow
+            label="Status"
+            value={
+              isAuthenticated
+                ? 'Signed in'
+                : isGuest
+                  ? 'Guest'
+                  : 'Signed out'
+            }
+          />
+          {isAuthenticated && syncEnabled ? (
+            <InfoRow label="Cloud sync" value={syncStatus} />
+          ) : null}
+          <ChevronRow
+            label="Account details"
+            testID="settings-account"
+            onPress={() => {
+              tap();
+              navigation.navigate('Account');
+            }}
+          />
+          {!isAuthenticated ? (
+            <ChevronRow
+              label="Sign in"
+              testID="settings-sign-in"
+              onPress={() => {
+                tap();
+                navigation.navigate('SignIn');
+              }}
+            />
+          ) : null}
+          {isAuthenticated ? (
+            <ChevronRow
+              label="Cloud sync"
+              testID="settings-cloud-sync"
+              onPress={() => {
+                tap();
+                navigation.navigate('CloudSync');
+              }}
+            />
+          ) : null}
+          <Text style={styles.disclosure}>
+            {authStatus === 'initializing'
+              ? 'Checking sign-in status…'
+              : 'Magic-link sign-in backs up progress when cloud sync is enabled.'}
+          </Text>
         </View>
       </ScrollView>
 

@@ -1,22 +1,27 @@
--- Number Rush: RPC functions, auth bootstrap trigger, and schema helpers for edge workflows.
--- Assumes migrations 0001–0011. Does not apply auth user deletion (edge function + service role).
+-- Number Rush: RPC functions, auth bootstrap trigger, and schema helpers.
+-- Assumes migrations 0001-0011 define the corrected Number Rush schema.
 
 -- ---------------------------------------------------------------------------
--- Columns required by RPC contracts (safe IF NOT EXISTS for idempotent apply)
+-- Replace prior definitions that used older progress/ranked return shapes.
 -- ---------------------------------------------------------------------------
 
-ALTER TABLE public.daily_submissions
-  ADD COLUMN IF NOT EXISTS validation_status text NOT NULL DEFAULT 'pending';
+DROP FUNCTION IF EXISTS public.get_ranked_leaderboard(integer);
+DROP FUNCTION IF EXISTS public.issue_ranked_run_ticket();
+DROP FUNCTION IF EXISTS public.get_daily_leaderboard(date, integer);
+DROP FUNCTION IF EXISTS public.get_daily_challenge(date);
+DROP FUNCTION IF EXISTS public.has_daily_submission(date);
+DROP FUNCTION IF EXISTS public.ensure_daily_challenge(date);
+DROP FUNCTION IF EXISTS public.claim_username(text);
+DROP FUNCTION IF EXISTS public.initialize_player_data();
+DROP FUNCTION IF EXISTS public.get_my_cloud_progress();
+DROP FUNCTION IF EXISTS public.delete_my_account_data();
+DROP FUNCTION IF EXISTS public.get_public_player_profile(text);
+DROP FUNCTION IF EXISTS public.calculate_ranked_points_delta(integer, integer, integer, integer);
 
-ALTER TABLE public.daily_submissions
-  DROP CONSTRAINT IF EXISTS daily_submissions_validation_status_check;
-
-ALTER TABLE public.daily_submissions
-  ADD CONSTRAINT daily_submissions_validation_status_check
-  CHECK (validation_status IN ('pending', 'accepted', 'rejected'));
-
-ALTER TABLE public.ranked_run_tickets
-  ADD COLUMN IF NOT EXISTS seed text;
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user();
+DROP FUNCTION IF EXISTS private.seed_player_rows(uuid);
+DROP FUNCTION IF EXISTS private.active_ranked_season_id();
 
 -- ---------------------------------------------------------------------------
 -- Private helpers (SECURITY DEFINER bodies stay off the public attack surface)
@@ -39,6 +44,7 @@ BEGIN
     RAISE EXCEPTION 'Not authenticated'
       USING ERRCODE = '28000';
   END IF;
+
   RETURN v_uid;
 END;
 $$;
@@ -55,16 +61,20 @@ AS $$
   SELECT regexp_replace(btrim(COALESCE(raw, '')), '\s+', ' ', 'g');
 $$;
 
+REVOKE ALL ON FUNCTION private.normalize_username_display(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.normalize_username_display(text) TO postgres, service_role;
+
 CREATE OR REPLACE FUNCTION private.normalize_username_key(raw text)
 RETURNS text
 LANGUAGE sql
 IMMUTABLE
 PARALLEL SAFE
 AS $$
-  SELECT lower(
-    regexp_replace(private.normalize_username_display(raw), '\s+', '', 'g')
-  );
+  SELECT lower(regexp_replace(private.normalize_username_display(raw), '\s+', '', 'g'));
 $$;
+
+REVOKE ALL ON FUNCTION private.normalize_username_key(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.normalize_username_key(text) TO postgres, service_role;
 
 CREATE OR REPLACE FUNCTION private.is_reserved_username(p_key text)
 RETURNS boolean
@@ -76,25 +86,35 @@ AS $$
     ARRAY[
       'admin',
       'administrator',
+      'mod',
       'moderator',
       'numberrush',
+      'official',
+      'owner',
+      'root',
+      'staff',
       'support',
       'system'
     ]::text[]
   );
 $$;
 
+REVOKE ALL ON FUNCTION private.is_reserved_username(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.is_reserved_username(text) TO postgres, service_role;
+
 CREATE OR REPLACE FUNCTION private.active_ranked_season_id()
-RETURNS text
+RETURNS uuid
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT id
-  FROM public.ranked_seasons
-  WHERE is_active = true
-  ORDER BY starts_at DESC
+  SELECT rs.id
+  FROM public.ranked_seasons rs
+  WHERE rs.active = true
+    AND now() >= rs.starts_at
+    AND now() < rs.ends_at
+  ORDER BY rs.starts_at DESC, rs.created_at DESC
   LIMIT 1;
 $$;
 
@@ -119,14 +139,15 @@ BEGIN
     v_suffix := substr(replace(gen_random_uuid()::text, '-', ''), 1, 8);
     v_display := 'Player' || v_suffix;
     v_key := private.normalize_username_key(v_display);
-  EXIT
-    WHEN NOT private.is_reserved_username(v_key)
+
+    EXIT WHEN (
+      NOT private.is_reserved_username(v_key)
       AND NOT EXISTS (
         SELECT 1
         FROM public.player_profiles p
         WHERE p.username_normalized = v_key
       )
-      OR v_attempt >= 12;
+    ) OR v_attempt >= 12;
   END LOOP;
 
   display_username := v_display;
@@ -147,13 +168,13 @@ AS $$
 DECLARE
   v_display text;
   v_key text;
-  v_season_id text;
+  v_season_id uuid;
 BEGIN
   IF p_user_id IS NULL THEN
     RAISE EXCEPTION 'user_id is required';
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM public.player_profiles WHERE id = p_user_id) THEN
+  IF NOT EXISTS (SELECT 1 FROM public.player_profiles p WHERE p.id = p_user_id) THEN
     SELECT g.display_username, g.normalized_username
     INTO v_display, v_key
     FROM private.generate_placeholder_username() AS g;
@@ -177,9 +198,23 @@ BEGIN
 
   v_season_id := private.active_ranked_season_id();
   IF v_season_id IS NOT NULL THEN
-    INSERT INTO public.ranked_profiles (user_id, season_id)
+    INSERT INTO public.ranked_profiles AS rp (user_id, season_id)
     VALUES (p_user_id, v_season_id)
-    ON CONFLICT (user_id, season_id) DO NOTHING;
+    ON CONFLICT (user_id) DO UPDATE
+    SET
+      season_id = EXCLUDED.season_id,
+      ranked_points = 0,
+      season_high_points = 0,
+      games_played = 0,
+      wins = 0,
+      losses = 0,
+      draws = 0,
+      current_win_streak = 0,
+      best_win_streak = 0,
+      promotions = 0,
+      demotions = 0,
+      updated_at = now()
+    WHERE rp.season_id IS DISTINCT FROM EXCLUDED.season_id;
   END IF;
 END;
 $$;
@@ -187,9 +222,10 @@ $$;
 REVOKE ALL ON FUNCTION private.seed_player_rows(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION private.seed_player_rows(uuid) TO postgres, service_role;
 
--- Ranked point delta for edge validation / match completion.
--- Base score brackets, plus survival bonuses. Returned delta is capped (+80 / -40).
--- When applying to a profile: new_points = GREATEST(0, current_ranked_points + delta).
+-- ---------------------------------------------------------------------------
+-- Ranked point helpers
+-- ---------------------------------------------------------------------------
+
 CREATE OR REPLACE FUNCTION public.calculate_ranked_points_delta(
   score integer,
   strikes_remaining integer,
@@ -200,12 +236,14 @@ RETURNS integer
 LANGUAGE plpgsql
 IMMUTABLE
 PARALLEL SAFE
+SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
-  v_base integer := 0;
-  v_bonus integer := 0;
+  v_base integer;
+  v_bonus integer;
   v_delta integer;
-  v_score integer := COALESCE(score, 0);
+  v_score integer := GREATEST(COALESCE(score, 0), 0);
   v_strikes integer := GREATEST(COALESCE(strikes_remaining, 0), 0);
   v_perfects integer := GREATEST(COALESCE(perfects, 0), 0);
   v_combo integer := GREATEST(COALESCE(max_combo, 0), 0);
@@ -232,6 +270,7 @@ BEGIN
   v_delta := v_base + v_bonus;
   v_delta := LEAST(v_delta, 80);
   v_delta := GREATEST(v_delta, -40);
+
   RETURN v_delta;
 END;
 $$;
@@ -257,7 +296,6 @@ $$;
 
 REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC;
 
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
@@ -278,31 +316,21 @@ DECLARE
   v_display text;
   v_key text;
 BEGIN
+  PERFORM private.seed_player_rows(v_uid);
+
   v_display := private.normalize_username_display(desired_username);
   v_key := private.normalize_username_key(desired_username);
 
   IF char_length(v_display) < 3 OR char_length(v_display) > 16 THEN
-    RETURN jsonb_build_object(
-      'ok', false,
-      'error', 'username_length',
-      'username', NULL
-    );
+    RETURN jsonb_build_object('ok', false, 'error', 'username_length', 'username', NULL);
   END IF;
 
-  IF v_key !~ '^[a-z0-9_]+$' OR v_key = '' THEN
-    RETURN jsonb_build_object(
-      'ok', false,
-      'error', 'username_invalid',
-      'username', NULL
-    );
+  IF v_key = '' OR v_key !~ '^[a-z0-9_]+$' THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'username_invalid', 'username', NULL);
   END IF;
 
   IF private.is_reserved_username(v_key) THEN
-    RETURN jsonb_build_object(
-      'ok', false,
-      'error', 'username_reserved',
-      'username', NULL
-    );
+    RETURN jsonb_build_object('ok', false, 'error', 'username_reserved', 'username', NULL);
   END IF;
 
   IF EXISTS (
@@ -311,11 +339,7 @@ BEGIN
     WHERE p.username_normalized = v_key
       AND p.id <> v_uid
   ) THEN
-    RETURN jsonb_build_object(
-      'ok', false,
-      'error', 'username_taken',
-      'username', NULL
-    );
+    RETURN jsonb_build_object('ok', false, 'error', 'username_taken', 'username', NULL);
   END IF;
 
   UPDATE public.player_profiles
@@ -324,20 +348,7 @@ BEGIN
     username_normalized = v_key
   WHERE id = v_uid;
 
-  IF NOT FOUND THEN
-    PERFORM private.seed_player_rows(v_uid);
-    UPDATE public.player_profiles
-    SET
-      username = v_display,
-      username_normalized = v_key
-    WHERE id = v_uid;
-  END IF;
-
-  RETURN jsonb_build_object(
-    'ok', true,
-    'error', NULL,
-    'username', v_display
-  );
+  RETURN jsonb_build_object('ok', true, 'error', NULL, 'username', v_display);
 END;
 $$;
 
@@ -349,16 +360,17 @@ SET search_path = public
 AS $$
 DECLARE
   v_row public.daily_challenges;
-  v_seed text := 'number-rush-daily-' || to_char(challenge_date, 'YYYY-MM-DD');
+  v_date date := COALESCE(challenge_date, CURRENT_DATE);
+  v_seed text := 'number-rush-daily-' || to_char(COALESCE(challenge_date, CURRENT_DATE), 'YYYY-MM-DD');
 BEGIN
   INSERT INTO public.daily_challenges (date_key, seed)
-  VALUES (challenge_date, v_seed)
+  VALUES (v_date, v_seed)
   ON CONFLICT (date_key) DO NOTHING;
 
-  SELECT *
+  SELECT dc.*
   INTO v_row
-  FROM public.daily_challenges
-  WHERE date_key = challenge_date;
+  FROM public.daily_challenges dc
+  WHERE dc.date_key = v_date;
 
   RETURN v_row;
 END;
@@ -367,7 +379,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.get_daily_challenge(challenge_date date DEFAULT CURRENT_DATE)
 RETURNS public.daily_challenges
 LANGUAGE sql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = public
 AS $$
@@ -385,7 +397,7 @@ AS $$
     SELECT 1
     FROM public.daily_submissions ds
     WHERE ds.user_id = private.assert_authenticated()
-      AND ds.date_key = challenge_date
+      AND ds.date_key = COALESCE(challenge_date, CURRENT_DATE)
   );
 $$;
 
@@ -407,7 +419,7 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  WITH v_uid AS (
+  WITH ctx AS (
     SELECT private.assert_authenticated() AS uid
   ),
   ranked AS (
@@ -418,20 +430,21 @@ AS $$
           ds.perfect_clears DESC,
           ds.max_combo_multiplier DESC,
           ds.submitted_at ASC
-      ) AS rank,
+      ) AS row_rank,
       p.username,
       ds.score,
       ds.perfect_clears,
       ds.max_combo_multiplier,
       ds.submitted_at,
-      (ds.user_id = (SELECT uid FROM v_uid)) AS is_current_user
+      (ds.user_id = ctx.uid) AS is_current_user
     FROM public.daily_submissions ds
     INNER JOIN public.player_profiles p ON p.id = ds.user_id
-    WHERE ds.date_key = p_date
+    CROSS JOIN ctx
+    WHERE ds.date_key = COALESCE(p_date, CURRENT_DATE)
       AND ds.validation_status = 'accepted'
   )
   SELECT
-    ranked.rank,
+    ranked.row_rank,
     ranked.username,
     ranked.score,
     ranked.perfect_clears,
@@ -439,7 +452,7 @@ AS $$
     ranked.submitted_at,
     ranked.is_current_user
   FROM ranked
-  ORDER BY ranked.rank
+  ORDER BY ranked.row_rank
   LIMIT GREATEST(LEAST(COALESCE(p_limit, 100), 500), 1);
 $$;
 
@@ -447,7 +460,7 @@ CREATE OR REPLACE FUNCTION public.issue_ranked_run_ticket()
 RETURNS TABLE (
   id uuid,
   seed text,
-  season_id text,
+  season_id uuid,
   expires_at timestamptz
 )
 LANGUAGE plpgsql
@@ -456,10 +469,10 @@ SET search_path = public
 AS $$
 DECLARE
   v_uid uuid := private.assert_authenticated();
-  v_season_id text;
+  v_season_id uuid;
   v_ticket_id uuid;
   v_seed text;
-  v_expires timestamptz;
+  v_expires_at timestamptz;
 BEGIN
   v_season_id := private.active_ranked_season_id();
   IF v_season_id IS NULL THEN
@@ -470,24 +483,26 @@ BEGIN
   PERFORM private.seed_player_rows(v_uid);
 
   UPDATE public.ranked_run_tickets t
-  SET expires_at = now()
+  SET
+    status = 'expired',
+    expires_at = GREATEST(t.issued_at + interval '1 millisecond', now())
   WHERE t.user_id = v_uid
     AND t.season_id = v_season_id
-    AND t.consumed_at IS NULL
-    AND t.expires_at > now();
+    AND t.status = 'active'
+    AND t.consumed_at IS NULL;
 
   v_seed := 'ranked-' || gen_random_uuid()::text;
-  v_expires := now() + interval '2 hours';
+  v_expires_at := now() + interval '2 hours';
 
-  INSERT INTO public.ranked_run_tickets (user_id, season_id, seed, expires_at)
-  VALUES (v_uid, v_season_id, v_seed, v_expires)
+  INSERT INTO public.ranked_run_tickets (user_id, season_id, seed, expires_at, status)
+  VALUES (v_uid, v_season_id, v_seed, v_expires_at, 'active')
   RETURNING ranked_run_tickets.id, ranked_run_tickets.seed, ranked_run_tickets.season_id, ranked_run_tickets.expires_at
-  INTO v_ticket_id, v_seed, v_season_id, v_expires;
+  INTO v_ticket_id, v_seed, v_season_id, v_expires_at;
 
   id := v_ticket_id;
   seed := v_seed;
   season_id := v_season_id;
-  expires_at := v_expires;
+  expires_at := v_expires_at;
   RETURN NEXT;
 END;
 $$;
@@ -497,10 +512,17 @@ RETURNS TABLE (
   rank bigint,
   username text,
   ranked_points integer,
-  division text,
-  subdivision integer,
+  season_high_points integer,
+  games_played integer,
   wins integer,
   losses integer,
+  draws integer,
+  current_win_streak integer,
+  best_win_streak integer,
+  promotions integer,
+  demotions integer,
+  division text,
+  subdivision integer,
   is_current_user boolean
 )
 LANGUAGE sql
@@ -508,7 +530,7 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  WITH v_ctx AS (
+  WITH ctx AS (
     SELECT
       private.assert_authenticated() AS uid,
       private.active_ranked_season_id() AS season_id
@@ -519,47 +541,72 @@ AS $$
         ORDER BY
           rp.ranked_points DESC,
           rp.wins DESC,
+          rp.games_played ASC,
           rp.updated_at ASC
-      ) AS rank,
+      ) AS row_rank,
       p.username,
       rp.ranked_points,
-      rp.division,
-      rp.subdivision,
+      rp.season_high_points,
+      rp.games_played,
       rp.wins,
       rp.losses,
-      (rp.user_id = v_ctx.uid) AS is_current_user
+      rp.draws,
+      rp.current_win_streak,
+      rp.best_win_streak,
+      rp.promotions,
+      rp.demotions,
+      CASE
+        WHEN rp.ranked_points >= 1500 THEN 'diamond'
+        WHEN rp.ranked_points >= 1200 THEN 'platinum'
+        WHEN rp.ranked_points >= 900 THEN 'gold'
+        WHEN rp.ranked_points >= 600 THEN 'silver'
+        ELSE 'bronze'
+      END AS division,
+      CASE
+        WHEN rp.ranked_points >= 1500 THEN 1
+        ELSE 4 - LEAST(3, GREATEST(0, ((rp.ranked_points % 300) / 100)::integer))
+      END AS subdivision,
+      (rp.user_id = ctx.uid) AS is_current_user
     FROM public.ranked_profiles rp
     INNER JOIN public.player_profiles p ON p.id = rp.user_id
-    CROSS JOIN v_ctx
-    WHERE rp.season_id = v_ctx.season_id
+    CROSS JOIN ctx
+    WHERE rp.season_id = ctx.season_id
   )
   SELECT
-    ranked.rank,
+    ranked.row_rank,
     ranked.username,
     ranked.ranked_points,
-    ranked.division,
-    ranked.subdivision,
+    ranked.season_high_points,
+    ranked.games_played,
     ranked.wins,
     ranked.losses,
+    ranked.draws,
+    ranked.current_win_streak,
+    ranked.best_win_streak,
+    ranked.promotions,
+    ranked.demotions,
+    ranked.division,
+    ranked.subdivision,
     ranked.is_current_user
   FROM ranked
-  ORDER BY ranked.rank
+  ORDER BY ranked.row_rank
   LIMIT GREATEST(LEAST(COALESCE(p_limit, 100), 500), 1);
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_my_cloud_progress()
 RETURNS jsonb
 LANGUAGE plpgsql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
   v_uid uuid := private.assert_authenticated();
-  v_season_id text := private.active_ranked_season_id();
+  v_season_id uuid;
   v_result jsonb;
 BEGIN
   PERFORM private.seed_player_rows(v_uid);
+  v_season_id := private.active_ranked_season_id();
 
   SELECT jsonb_build_object(
     'profile', (
@@ -589,7 +636,7 @@ BEGIN
         AND rp.season_id = v_season_id
     ),
     'sync_devices', (
-      SELECT COALESCE(jsonb_agg(to_jsonb(sm)), '[]'::jsonb)
+      SELECT COALESCE(jsonb_agg(to_jsonb(sm) ORDER BY sm.updated_at DESC), '[]'::jsonb)
       FROM public.sync_metadata sm
       WHERE sm.user_id = v_uid
     )
@@ -603,6 +650,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.initialize_player_data()
 RETURNS jsonb
 LANGUAGE plpgsql
+VOLATILE
 SECURITY DEFINER
 SET search_path = public
 AS $$
@@ -625,8 +673,7 @@ DECLARE
 BEGIN
   DELETE FROM public.economy_transactions WHERE user_id = v_uid;
   DELETE FROM public.daily_submissions WHERE user_id = v_uid;
-  DELETE FROM public.ranked_matches
-  WHERE player_a_id = v_uid OR player_b_id = v_uid;
+  DELETE FROM public.ranked_matches WHERE user_id = v_uid;
   DELETE FROM public.ranked_run_tickets WHERE user_id = v_uid;
   DELETE FROM public.ranked_profiles WHERE user_id = v_uid;
   DELETE FROM public.sync_metadata WHERE user_id = v_uid;
@@ -649,23 +696,38 @@ AS $$
   SELECT jsonb_build_object(
     'username', p.username,
     'level', p.level,
-    'selected_theme_id', p.selected_theme_id,
+    'selected_theme_id', pr.selected_theme_id,
     'statistics', jsonb_build_object(
       'highest_classic_score', s.highest_classic_score,
       'games_played', s.games_played,
       'daily_wins', s.daily_wins,
       'ranked_wins', s.ranked_wins,
       'highest_combo_multiplier', s.highest_combo_multiplier
-    )
+    ),
+    'ranked', CASE
+      WHEN rp.user_id IS NULL THEN NULL
+      ELSE jsonb_build_object(
+        'ranked_points', rp.ranked_points,
+        'season_high_points', rp.season_high_points,
+        'games_played', rp.games_played,
+        'wins', rp.wins,
+        'losses', rp.losses,
+        'draws', rp.draws
+      )
+    END
   )
   FROM public.player_profiles p
+  INNER JOIN public.player_progress pr ON pr.user_id = p.id
   INNER JOIN public.player_statistics s ON s.user_id = p.id
+  LEFT JOIN public.ranked_profiles rp
+    ON rp.user_id = p.id
+   AND rp.season_id = private.active_ranked_season_id()
   WHERE p.username_normalized = private.normalize_username_key(p_username)
   LIMIT 1;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Grants: no PUBLIC execute; authenticated clients call RPCs only (no service role in app)
+-- Grants: no PUBLIC execute; authenticated clients call RPCs only.
 -- ---------------------------------------------------------------------------
 
 REVOKE ALL ON FUNCTION public.calculate_ranked_points_delta(integer, integer, integer, integer) FROM PUBLIC;

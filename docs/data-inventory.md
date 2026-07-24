@@ -1,56 +1,35 @@
-# Number Rush — Data Inventory (SDKs & Local Processing)
+# Number Rush — Data Inventory
 
-**App mode:** Local-only beta — no Number Rush backend, accounts, IAP validation, ads, or push.  
-**Persistence:** `@react-native-async-storage/async-storage` on device.
+**Modes:** Guest (local) and optional Authenticated (Supabase).  
+**Persistence:** AsyncStorage + SecureStore (session) on device; Supabase Postgres when configured.
 
-## First-party local data categories
+## First-party data
 
-| Category | Examples | Leaves device? |
-|----------|----------|----------------|
-| Progress | XP, level, coins, gems, inventory, themes, best score | No |
-| Daily | Official/practice attempt flags, local scores, date key | No |
-| Missions | Daily/weekly completion + claim state | No |
-| Settings | Music/SFX volumes, haptics, reduced motion, high contrast | No |
-| Economy ledger | Local transaction IDs / history (duplicate protection) | No |
-| Username display | Local profile display name generator | No |
+| Category | Guest | Authenticated cloud | Public? |
+|----------|-------|---------------------|---------|
+| Profile XP/level/themes | Local | Synced | Level/theme may be public |
+| Coins/gems/inventory | Local | Synced (server-trusted path planned) | No |
+| Missions/settings | Local | Missions mergeable; settings device-local preferred | No |
+| Official Daily scores | Local preview only | Server submissions | Username + score on LB |
+| Ranked Points / matches | Local preview | Server-validated | Username + RP on LB |
+| Email | No | Auth only | No |
+| Install device ID | Local | Sync metadata | No |
+| Access/refresh tokens | No | SecureStore / web storage | No |
 
-## SDK / library inventory
+## SDK inventory (additions)
 
-| Package | Role | May process / access | Network / PII |
-|---------|------|----------------------|---------------|
-| `expo` (~57) | Runtime, tooling, native modules bridge | App config, updates machinery when EAS Update configured | OTA only if operator publishes; no user accounts |
-| `react` / `react-native` | UI runtime | In-memory UI state | No |
-| `@react-native-async-storage/async-storage` | Key-value persistence | Local progress / settings keys | Device-local only |
-| `@react-navigation/native` + `native-stack` | Navigation | Route names / params in memory | No remote telemetry by default |
-| `expo-font` + `@expo-google-fonts/*` | Font loading | Font assets bundled / loaded for rendering | Font packages are assets; no user content upload |
-| `expo-audio` | Music / SFX playback | Local audio files; playback session | No cloud audio |
-| `expo-haptics` | Tactile feedback | Requests OS haptic patterns when enabled | No PII |
-| `@react-native-community/slider` | Volume controls | Touch input → numeric values in settings | No |
-| `react-native-svg` | Vector icons / shapes | Render-only | No |
-| `expo-linear-gradient` | Visual gradients | Render-only | No |
-| `expo-status-bar` | Status bar style | UI chrome | No |
-| `expo-asset` | Asset loading peer for audio/media | Bundled asset resolution | No |
-| `expo-splash-screen` | Native splash presentation | Splash image config | No |
-| `react-native-safe-area-context` | Insets | Layout metrics | No |
-| `react-native-screens` | Native screen containers | Navigation presentation | No |
-| `lucide-react-native` | Icon components | Render-only | No |
-| `react-native-web` / `react-dom` | Web target | Same local logic in browser storage model | Still no NR backend |
+| Package | Role | Network / PII |
+|---------|------|---------------|
+| `@supabase/supabase-js` | Auth + DB RPC + functions invoke | Email auth; cloud rows when signed in |
+| `expo-secure-store` | Session persistence (native) | Tokens on device |
+| `react-native-url-polyfill` | URL APIs for Supabase | None |
+| `expo-network` | Connectivity | None |
+| `expo-linking` | Magic-link callback | Auth redirect URLs |
+
+Prior Expo/RN packages unchanged (fonts, audio, haptics, navigation, AsyncStorage, etc.).
 
 ## Explicitly not present
 
-- Auth / identity SDKs
-- Analytics vendor SDKs (adapter is no-op / local debug)
-- Crash reporter vendor (flag exists; no vendor wired)
-- Ad mediation / attribution
-- IAP / billing SDKs
-- Push notification services
-
-## Beta feedback
-
-`BetaFeedbackScreen` formats a report for the user to **share via OS Share sheet**. Nothing is submitted to a Number Rush server from that screen.
-
-## When this inventory must be updated
-
-- Adding any network API, account system, analytics, ads, or IAP
-- Enabling EAS Update in production (document update CDN as infrastructure processing of JS bundles — not player save data)
-- Wiring privacy policy / terms URLs that load remote pages
+- Ads / IAP / push SDKs
+- Service-role key in client
+- Chat / friends / KYC / geolocation SDKs

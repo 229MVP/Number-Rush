@@ -1,6 +1,11 @@
-import { DAILY_MAX_TILES, MAX_STRIKES, TARGET_VALUE } from './gameConstants';
+import {
+  DAILY_MAX_TILES,
+  MAX_STRIKES,
+  RANKED_MAX_TILES,
+  TARGET_VALUE,
+} from './gameConstants';
 import { getDailySeed, getUtcDateKey } from './dailyTournament';
-import type { RunConfiguration } from './gameTypes';
+import type { GameMode, RunConfiguration } from './gameTypes';
 
 export const CLASSIC_CONFIG: RunConfiguration = {
   mode: 'classic',
@@ -32,8 +37,23 @@ export function getDailyConfig(
   };
 }
 
+export function getRankedConfig(seed: string): RunConfiguration {
+  if (!seed.trim()) {
+    throw new Error('Ranked mode requires a server-issued seed');
+  }
+  return {
+    mode: 'ranked',
+    targetValue: TARGET_VALUE,
+    maximumStrikes: MAX_STRIKES,
+    maximumTiles: RANKED_MAX_TILES,
+    seed: seed.trim(),
+    powerUpsEnabled: false,
+    officialAttempt: true,
+  };
+}
+
 export function resolveRunConfig(partial?: {
-  mode?: 'classic' | 'daily';
+  mode?: GameMode;
   seed?: string;
   officialAttempt?: boolean;
 }): RunConfiguration {
@@ -44,6 +64,12 @@ export function resolveRunConfig(partial?: {
       return { ...config, seed: partial.seed };
     }
     return config;
+  }
+  if (mode === 'ranked') {
+    if (!partial?.seed) {
+      throw new Error('Ranked mode requires a seed');
+    }
+    return getRankedConfig(partial.seed);
   }
   return getClassicConfig();
 }

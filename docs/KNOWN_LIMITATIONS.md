@@ -1,33 +1,26 @@
-# Number Rush — Known Limitations (Beta)
+# Number Rush — Known Limitations (Connected Backend Phase)
 
 ## Product
 
-- **Ranked** is a Coming Soon stub (no divisions, RP, or match engine).
-- **Leaderboard / Ranks** tab is a Coming Soon stub (Daily has a local mock board only).
-- **No accounts**, cloud save, friends, or cross-device sync.
-- **No ads** and **no real-money IAP** (coin/gem packs show as coming later).
-- Daily “tournament” is a **local seeded daily puzzle**, not a networked competition with prizes.
+- **No social friends**, chat, or live head-to-head multiplayer.
+- **No ads**, real-money IAP, subscriptions, or cash prizes.
+- **No push notifications.**
+- Practice Daily scores remain **local**.
+- Ranked season reset is **not automated**.
+- Anti-cheat is **basic server replay**, not enterprise fraud detection.
+- Advanced moderation dashboard is not built.
 
-## Technical
+## Backend / accounts
 
-- Persistence is **AsyncStorage only** — clearing app data wipes progress.
-- `android.package` and `ios.bundleIdentifier` are **MISSING** (store blockers).
-- Native splash is wired via `expo-splash-screen` plugin (asset is temporary/placeholder quality).
-- Audio is **placeholder synthesized WAV** content.
-- Analytics / error reporting have **no remote vendor** wired by default.
-- `__DEV__` helpers can alter local progression / daily state in development builds.
-- Store screenshot set is **not produced** yet.
-- EAS CLI not logged in in this environment (`eas project:info` requires `eas login` or `EXPO_TOKEN`)
-- Maestro E2E flows are stubbed; **not executed** against a device/APK yet
-- Ranked RP / division unit tests deferred — see `docs/ranked-tests-deferred.md`
-- `npm audit` reports moderate transitive vulnerabilities (not force-upgraded)
+- Cloud features require a **dedicated Number Rush Supabase project** (not applied remotely in this PR).
+- Until URL + anon key are configured, the app stays in **local/guest** mode.
+- Account recovery depends on **email access** (magic link).
+- SQL/RLS integration tests and Edge Function deploys are **not yet executed** against a live Number Rush project.
+- Ranked match results still finish through local reward paths; **server validate-run** must be deployed for trusted RP.
 
-## Design / assets
+## Store / ops
 
-- `design_reference/` is preserved for UI reference — not the runtime entry.
-- Some icon assets exist both as PNG/SVG while UI primarily uses Lucide.
-
-## Documentation
-
-- Privacy Policy and Terms in-app / under `docs/*-draft.md` are **DRAFT**.
-- iOS privacy API strings must be verified from a real binary — not invented in docs.
+- `android.package` and `ios.bundleIdentifier` remain **MISSING**.
+- Placeholder audio / splash art quality.
+- Maestro E2E not run on device.
+- Privacy / Terms remain **DRAFT** until hosted URLs exist.

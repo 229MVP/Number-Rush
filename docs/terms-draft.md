@@ -5,47 +5,30 @@
 
 ## 1. Acceptance
 
-By downloading or playing Number Rush (“the App”), you agree to these Terms. If you do not agree, do not use the App.
+By downloading or playing Number Rush (“the App”), you agree to these Terms.
 
-## 2. The service (beta / local)
+## 2. The service
 
-The App is a single-player number puzzle game. In the current beta:
+Number Rush is a single-player number puzzle game. You may play as a **Guest** with local progress, or optionally create an account via **email magic link** for cloud backup and live competitive leaderboards when the publisher enables connected features.
 
-- Classic Rush and Daily Tournament modes function **locally on your device**
-- Ranked mode and the global Leaderboard / Ranks tab are **Coming Soon** placeholders and do not provide online matchmaking or competitive rankings
-- There are **no user accounts**, **no cloud save**, **no real-money in-app purchases**, and **no advertisements** in this build
+- Classic Rush is always available offline.
+- Official Daily and Ranked live competition require authentication and a configured backend.
+- Practice Daily remains local.
+- There are **no advertisements**, **no real-money purchases**, and **no cash prizes** in this phase.
+- Virtual coins, gems, power-ups, and themes have **no real-world cash value**.
 
-Features may change without notice during beta.
+## 3. Accounts
 
-## 3. License
+You are responsible for access to the email inbox used for magic links. Do not share account access. We may suspend accounts that abuse leaderboards or attempt to manipulate server validation.
 
-We grant you a personal, non-exclusive, non-transferable, revocable license to use the App for entertainment on devices you own or control. You may not reverse engineer, redistribute, or exploit the App except as allowed by applicable law.
+## 4. Fair play
 
-## 4. Virtual items
+Server-validated runs may be rejected when impossible or duplicated. Ranked Points and official Daily scores are determined by server replay, not client claims alone.
 
-Coins, gems, power-ups, themes, XP, and mission rewards are **local virtual items** with no real-world cash value. They are not redeemable for money. Real-money purchase packs, if shown, are disabled (“coming later”) and must not be represented as available.
+## 5. Data & deletion
 
-## 5. Fair play & local data
+See the Privacy Policy draft. You may export a local summary and request account deletion in-app (typed DELETE) when the deletion Edge Function is deployed.
 
-Because progress is stored locally, you are responsible for your device. Resetting progress, clearing app storage, or using development builds may erase or alter local state. We are not obligated to restore local data.
+## 6. Limitation of liability / governing law
 
-## 6. Disclaimer of warranties
-
-THE APP IS PROVIDED “AS IS” AND “AS AVAILABLE” WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. Beta builds may contain bugs, placeholder audio, and incomplete modes.
-
-## 7. Limitation of liability
-
-TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE ARE NOT LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR LOST-DATA DAMAGES ARISING FROM USE OF THE APP.
-
-## 8. Store terms
-
-If you obtained the App from Apple App Store or Google Play, those platforms’ terms also apply. Platform operators are not responsible for maintenance or support of the App unless required by law.
-
-## 9. Changes & contact
-
-We may update these Terms for new online features, accounts, or monetization. Continued use after notice constitutes acceptance where permitted by law.
-
-Publisher: [TODO]  
-Support: [TODO]
-
-In-app Legal screen content is labeled **DRAFT** until `EXPO_PUBLIC_TERMS_URL` points to a finalized hosted document.
+[TODO — counsel]

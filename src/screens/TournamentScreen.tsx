@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -13,6 +13,12 @@ import {
   calculateDailyRank,
   DAILY_LEADERBOARD,
 } from '../data/dailyLeaderboard';
+import {
+  fetchDailyLeaderboard,
+  type DailyLeaderboardRow,
+} from '../backend/dailyLeaderboardService';
+import { liveDailyLeaderboardEnabled } from '../config/featureFlags';
+import { useAuth } from '../hooks/useAuth';
 import { DAILY_MAX_TILES, TARGET_VALUE } from '../game/gameConstants';
 import { getDailySeed, getUtcDateKey } from '../game/dailyTournament';
 import { useDailyCountdown } from '../hooks/useDailyCountdown';
@@ -52,12 +58,17 @@ function formatCompletedAt(iso: string): string {
 
 export function TournamentScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { isAuthenticated, isGuest } = useAuth();
   const [dateKey, setDateKey] = useState(() => getUtcDateKey());
   const [official, setOfficial] = useState<DailyOfficialRecord | null>(null);
   const [practice, setPractice] = useState<DailyPracticeRecord | null>(null);
   const [allTimeBest, setAllTimeBest] = useState<DailyAllTimeBest | null>(null);
   const [starting, setStarting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [liveBoard, setLiveBoard] = useState<{
+    mode: string;
+    entries: DailyLeaderboardRow[];
+  } | null>(null);
 
   const refresh = useCallback(async (key: string = getUtcDateKey()) => {
     setDateKey(key);
@@ -70,6 +81,12 @@ export function TournamentScreen({ navigation }: Props) {
     setPractice(prac);
     setAllTimeBest(best);
     setStatusMessage(null);
+
+    const daily = await fetchDailyLeaderboard({
+      localScore: rec?.score ?? null,
+      limit: 50,
+    });
+    setLiveBoard({ mode: daily.mode, entries: daily.entries });
   }, []);
 
   const { label: countdown } = useDailyCountdown((nextKey) => {
@@ -87,24 +104,55 @@ export function TournamentScreen({ navigation }: Props) {
     else navigation.navigate('MainMenu');
   };
 
+  const startOfficialGameplay = async () => {
+    const key = getUtcDateKey();
+    const stillOpen = !(await hasCompletedOfficialDailyAttempt(key));
+    if (!stillOpen) {
+      setStatusMessage(
+        'Official attempt already completed for today. Practice is available.',
+      );
+      await refresh(key);
+      return;
+    }
+    navigation.navigate('Gameplay', {
+      mode: 'daily',
+      seed: getDailySeed(key),
+      officialAttempt: true,
+    });
+  };
+
   const enterOfficial = async () => {
     if (starting) return;
+    if (isGuest && liveDailyLeaderboardEnabled) {
+      Alert.alert(
+        'Account required',
+        'Official daily scores submit to the live leaderboard when signed in.',
+        [
+          { text: 'CANCEL', style: 'cancel' },
+          {
+            text: 'CREATE ACCOUNT',
+            onPress: () => navigation.navigate('SignIn'),
+          },
+          {
+            text: 'CONTINUE OFFLINE',
+            onPress: () => {
+              void (async () => {
+                setStarting(true);
+                try {
+                  await startOfficialGameplay();
+                } finally {
+                  setStarting(false);
+                }
+              })();
+            },
+          },
+        ],
+      );
+      return;
+    }
     setStarting(true);
     try {
-      const key = getUtcDateKey();
-      const stillOpen = !(await hasCompletedOfficialDailyAttempt(key));
-      if (!stillOpen) {
-        setStatusMessage(
-          'Official attempt already completed for today. Practice is available.',
-        );
-        await refresh(key);
-        return;
-      }
-      navigation.navigate('Gameplay', {
-        mode: 'daily',
-        seed: getDailySeed(key),
-        officialAttempt: true,
-      });
+      await startOfficialGameplay();
     } finally {
       setStarting(false);
     }
@@ -124,9 +172,16 @@ export function TournamentScreen({ navigation }: Props) {
     DAILY_LEADERBOARD,
     official?.score ?? null,
   );
+  const useLive =
+    liveDailyLeaderboardEnabled &&
+    isAuthenticated &&
+    liveBoard?.mode === 'live';
+  const displayRows: DailyLeaderboardRow[] = useLive
+    ? liveBoard!.entries
+    : board;
   const preview = (() => {
-    const top = board.slice(0, 3);
-    const local = board.find((r) => r.isLocalPlayer);
+    const top = displayRows.slice(0, 3);
+    const local = displayRows.find((r) => r.isLocalPlayer);
     if (local && !top.some((r) => r.isLocalPlayer)) {
       return [...top, local];
     }
@@ -239,7 +294,9 @@ export function TournamentScreen({ navigation }: Props) {
         )}
 
         <Text style={styles.sectionLabel}>LEADERBOARD</Text>
-        <Text style={styles.localPreview}>LOCAL PREVIEW</Text>
+        <Text style={styles.localPreview}>
+          {useLive ? 'LIVE LEADERBOARD' : 'LOCAL PREVIEW'}
+        </Text>
         {preview.map((p) => (
           <View
             key={p.id}
