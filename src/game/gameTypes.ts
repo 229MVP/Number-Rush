@@ -107,7 +107,7 @@ export type GameOverPayload = {
   swapsUsed: number;
 };
 
-export type GameMode = 'classic' | 'daily';
+export type GameMode = 'classic' | 'daily' | 'ranked';
 
 export type RunConfiguration = {
   mode: GameMode;

@@ -46,6 +46,15 @@ import {
   measureTutorialTarget,
   type TutorialTargetRect,
 } from '../utils/measureTutorialTarget';
+import { RevivePanel } from '../components/monetization/RevivePanel';
+import { rewardedAdsEnabled } from '../config/featureFlags';
+import { useAds } from '../hooks/useAds';
+import type { RunStats } from '../game/gameTypes';
+import {
+  isReviveUsedForRun,
+  markReviveUsedForRun,
+  readAdFrequencyState,
+} from '../storage/adFrequencyStorage';
 import { colors, fontFamilies, neonGlow, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Gameplay'>;
@@ -67,6 +76,16 @@ export function GameplayScreen({ navigation, route }: Props) {
   const [rootSize, setRootSize] = useState({ width: 0, height: 0 });
   const [trayOpen, setTrayOpen] = useState(false);
   const [wildPickerOpen, setWildPickerOpen] = useState(false);
+  const [showRevive, setShowRevive] = useState(false);
+  const [reviveBusy, setReviveBusy] = useState(false);
+
+  const ads = useAds();
+  const runIdRef = useRef(
+    `run-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+  );
+  const reviveAlreadyUsedRef = useRef(false);
+  const pendingProceedRef = useRef<(() => void) | null>(null);
+  const gameOverNavigatedRef = useRef(false);
 
   const gameplayRootRef = useRef<View>(null);
   const currentTileTargetRef = useRef<View>(null);
@@ -92,10 +111,30 @@ export function GameplayScreen({ navigation, route }: Props) {
 
   const onGameOver = useCallback(
     (payload: GameOverPayload) => {
+      if (gameOverNavigatedRef.current) return;
+      gameOverNavigatedRef.current = true;
       audio?.playSound('gameOver');
       navigation.replace('GameOver', payload);
     },
     [navigation, audio],
+  );
+
+  const onReviveOpportunity = useCallback(
+    ({
+      stats: _stats,
+      proceed,
+    }: {
+      stats: RunStats;
+      proceed: () => void;
+    }) => {
+      if (runConfig.mode !== 'classic') return false;
+      if (!rewardedAdsEnabled || !ads.adsAvailable) return false;
+      if (reviveAlreadyUsedRef.current) return false;
+      pendingProceedRef.current = proceed;
+      setShowRevive(true);
+      return true;
+    },
+    [runConfig.mode, ads.adsAvailable],
   );
 
   const onDailyComplete = useCallback(
@@ -110,7 +149,21 @@ export function GameplayScreen({ navigation, route }: Props) {
     configuration: runConfig,
     onGameOver,
     onDailyComplete,
+    onReviveOpportunity:
+      runConfig.mode === 'classic' ? onReviveOpportunity : undefined,
+    runId: runIdRef.current,
   });
+
+  useEffect(() => {
+    if (runConfig.mode !== 'classic') return;
+    void readAdFrequencyState().then((state) => {
+      reviveAlreadyUsedRef.current = isReviveUsedForRun(
+        state,
+        runIdRef.current,
+      );
+    });
+    ads.preloadRewarded();
+  }, [runConfig.mode, ads]);
 
   useEffect(() => {
     if (!focused) return;
@@ -210,7 +263,8 @@ export function GameplayScreen({ navigation, route }: Props) {
     tutorialVisible ||
     trayOpen ||
     wildPickerOpen ||
-    game.gameStatus === 'paused';
+    game.gameStatus === 'paused' ||
+    showRevive;
 
   const inputLocked =
     game.gameStatus === 'resolving' ||
@@ -347,18 +401,50 @@ export function GameplayScreen({ navigation, route }: Props) {
   };
 
   const powerLocked = game.powerUpsEnabled ? null : 'DISABLED IN TOURNAMENT';
-  const modeBadge = game.mode === 'daily' ? 'DAILY' : null;
+  const modeBadge =
+    game.mode === 'daily' ? 'DAILY' : game.mode === 'ranked' ? 'RANKED' : null;
   const attemptLabel =
     game.mode === 'daily'
       ? game.officialAttempt
         ? 'OFFICIAL'
         : 'PRACTICE'
-      : null;
+      : game.mode === 'ranked'
+        ? 'MATCH'
+        : null;
 
   const lanePad = 10;
   const laneGap = 7;
   const laneWidth =
     (boardWidth - lanePad * 2 - laneGap * (LANE_COUNT - 1)) / LANE_COUNT;
+
+  const endRunAfterReviveDecline = useCallback(() => {
+    setShowRevive(false);
+    const proceed = pendingProceedRef.current;
+    pendingProceedRef.current = null;
+    proceed?.();
+  }, []);
+
+  const watchReviveAd = useCallback(() => {
+    if (reviveBusy) return;
+    setReviveBusy(true);
+    void (async () => {
+      try {
+        const result = await ads.showRewarded({
+          placement: 'classic_revive',
+          opportunityId: runIdRef.current,
+        });
+        if (result.earned) {
+          await markReviveUsedForRun(runIdRef.current);
+          reviveAlreadyUsedRef.current = true;
+          game.reviveFromRewardedAd();
+          setShowRevive(false);
+          pendingProceedRef.current = null;
+        }
+      } finally {
+        setReviveBusy(false);
+      }
+    })();
+  }, [ads, game, reviveBusy]);
 
   const extraSelectedCount =
     (game.bombSelected ? 1 : 0) +
@@ -668,6 +754,14 @@ export function GameplayScreen({ navigation, route }: Props) {
         onForfeitOfficial={() => {
           void game.forfeitOfficialDaily();
         }}
+      />
+
+      <RevivePanel
+        visible={showRevive}
+        loading={reviveBusy}
+        adUnavailable={!ads.adsAvailable || ads.rewardedState === 'unavailable'}
+        onWatchAd={watchReviveAd}
+        onEndRun={endRunAfterReviveDecline}
       />
 
       <TutorialOverlay

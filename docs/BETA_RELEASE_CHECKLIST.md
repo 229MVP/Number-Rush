@@ -34,9 +34,11 @@
 | Leaderboard global / friends | NOT APPLICABLE | Coming Soon stub |
 | Missions claim (local) | PASS | |
 | Shop soft-currency purchase | PASS | Duplicate txn protected |
-| Real-money IAP | NOT APPLICABLE | Disabled / coming later |
-| Ads | NOT APPLICABLE | None |
-| Accounts / cloud sync | NOT APPLICABLE | None |
+| Real-money IAP | BLOCKED | RevenueCat wired; needs store products + sandbox + webhook |
+| Ads | BLOCKED | AdMob wired with **test IDs** only; consent/SSV not production-proven |
+| Accounts / cloud sync | PASS / BLOCKED | Code present; needs Number Rush Supabase project |
+| Remove Ads / gem packs / starter bundle | BLOCKED | Client catalog ready; not live-billed |
+| Number Rush Club subscription | NOT APPLICABLE | Flagged off until launch checklist |
 
 ## Client quality
 

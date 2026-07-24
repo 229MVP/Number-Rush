@@ -114,7 +114,8 @@ type Action =
   | { type: 'CLEAR_LANE_FEEDBACK'; laneIndex: number; resetTotal: boolean }
   | { type: 'ADD_POPUP'; popup: FloatingPopup }
   | { type: 'REMOVE_POPUP'; id: string }
-  | { type: 'SET_GAME_OVER' };
+  | { type: 'SET_GAME_OVER' }
+  | { type: 'REVIVE_STRIKE' };
 
 let activeGenerator = createNewRun(getClassicConfig()).tileGenerator;
 
@@ -493,6 +494,13 @@ function reducer(state: State, action: Action): State {
     case 'SET_GAME_OVER':
       return { ...state, gameStatus: 'gameOver' };
 
+    case 'REVIVE_STRIKE':
+      return {
+        ...state,
+        strikesRemaining: Math.max(1, state.strikesRemaining + 1),
+        gameStatus: 'playing',
+      };
+
     default:
       return state;
   }
@@ -504,12 +512,20 @@ type Options = {
   configuration: RunConfiguration;
   onGameOver: (payload: GameOverPayload) => void;
   onDailyComplete: (params: DailyResultsParams) => void;
+  /** Classic strikes game-over only. Return true to defer navigation (revive UI). */
+  onReviveOpportunity?: (ctx: {
+    stats: RunStats;
+    proceed: () => void;
+  }) => boolean;
+  runId?: string;
 };
 
 export function useNumberRushGame({
   configuration,
   onGameOver,
   onDailyComplete,
+  onReviveOpportunity,
+  runId: runIdProp,
 }: Options) {
   const configRef = useRef(configuration);
   configRef.current = configuration;
@@ -520,6 +536,11 @@ export function useNumberRushGame({
   onGameOverRef.current = onGameOver;
   const onDailyCompleteRef = useRef(onDailyComplete);
   onDailyCompleteRef.current = onDailyComplete;
+  const onReviveOpportunityRef = useRef(onReviveOpportunity);
+  onReviveOpportunityRef.current = onReviveOpportunity;
+  const runIdRef = useRef(
+    runIdProp ?? `run-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+  );
   const placingRef = useRef(false);
   const finishingRef = useRef(false);
   const inventoryRef = useRef<Partial<RunPowerInventory> | null>(null);
@@ -599,6 +620,13 @@ export function useNumberRushGame({
       swapsUsed: usageRef.current.swapsUsed,
     });
   }, []);
+
+  const proceedClassicGameOver = useCallback(
+    (stats: RunStats) => {
+      void finishClassic(stats);
+    },
+    [finishClassic],
+  );
 
   const finishDaily = useCallback(
     async (stats: RunStats, reason: RunCompletionReason, cfg: RunConfiguration) => {
@@ -687,6 +715,24 @@ export function useNumberRushGame({
         await finishDaily(stats, reason, cfg);
         return;
       }
+      if (
+        cfg.mode === 'classic' &&
+        reason === 'strikes' &&
+        onReviveOpportunityRef.current
+      ) {
+        const deferred = onReviveOpportunityRef.current({
+          stats,
+          proceed: () => {
+            void finishClassic(stats);
+          },
+        });
+        if (deferred) {
+          finishingRef.current = false;
+          return;
+        }
+      }
+      // Ranked uses Classic local reward path for now; server validation
+      // is queued separately when cloud features are configured.
       await finishClassic(stats);
     },
     [finishClassic, finishDaily],
@@ -1000,6 +1046,14 @@ export function useNumberRushGame({
     restartGame,
     quitGame,
     forfeitOfficialDaily,
+    reviveFromRewardedAd: () => {
+      dispatch({ type: 'REVIVE_STRIKE' });
+      finishingRef.current = false;
+    },
+    runId: runIdRef.current,
+    proceedClassicGameOver: (stats?: RunStats) => {
+      proceedClassicGameOver(stats ?? state.runStats);
+    },
   };
 }
 

@@ -12,6 +12,7 @@ export const SWAP_STARTING_QUANTITY = 3;
 export const MULTIPLIER_FACTOR = 2;
 
 export const DAILY_MAX_TILES = 40;
+export const RANKED_MAX_TILES = 30;
 
 export const TILE_MOVE_DURATION = 250;
 export const NORMAL_FEEDBACK_DURATION = 300;

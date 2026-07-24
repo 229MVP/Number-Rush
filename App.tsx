@@ -23,15 +23,22 @@ import {
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
 import { AnalyticsProvider } from './src/analytics/AnalyticsProvider';
+import { AuthProvider } from './src/auth/AuthProvider';
+import { AdsProvider } from './src/ads/AdsProvider';
+import { ConsentProvider } from './src/consent/ConsentProvider';
+import { PurchasesProvider } from './src/purchases/PurchasesProvider';
 import { BetaBadge } from './src/components/BetaBadge';
 import { validateEnvironment } from './src/config/validateEnvironment';
 import { AppErrorBoundary } from './src/errors/AppErrorBoundary';
 import { logger } from './src/logging/logger';
+import { NetworkProvider } from './src/network/NetworkProvider';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { SettingsProvider } from './src/settings/SettingsProvider';
 import { AudioProvider } from './src/audio/AudioProvider';
 import { HapticsProvider } from './src/haptics/HapticsProvider';
 import { GameThemeProvider } from './src/themes/GameThemeProvider';
+import { CloudSyncProvider } from './src/sync/CloudSyncProvider';
+import { SubmissionProvider } from './src/submissions/SubmissionProvider';
 import { colors, fontFamilies } from './src/theme';
 
 /** Optional init must not block startup forever. */
@@ -96,19 +103,33 @@ export default function App() {
           setBoundaryKey((k) => k + 1);
         }}
       >
-        <SettingsProvider>
-          <AudioProvider>
-            <HapticsProvider>
-              <GameThemeProvider>
-                <AnalyticsProvider>
-                  <StatusBar style="light" />
-                  <AppNavigator key={navKey.current} />
-                  <BetaBadge />
-                </AnalyticsProvider>
-              </GameThemeProvider>
-            </HapticsProvider>
-          </AudioProvider>
-        </SettingsProvider>
+        <NetworkProvider>
+          <AuthProvider>
+            <ConsentProvider>
+              <AdsProvider>
+                <PurchasesProvider>
+                  <SettingsProvider>
+                    <AudioProvider>
+                      <HapticsProvider>
+                        <GameThemeProvider>
+                          <CloudSyncProvider>
+                            <SubmissionProvider>
+                              <AnalyticsProvider>
+                                <StatusBar style="light" />
+                                <AppNavigator key={navKey.current} />
+                                <BetaBadge />
+                              </AnalyticsProvider>
+                            </SubmissionProvider>
+                          </CloudSyncProvider>
+                        </GameThemeProvider>
+                      </HapticsProvider>
+                    </AudioProvider>
+                  </SettingsProvider>
+                </PurchasesProvider>
+              </AdsProvider>
+            </ConsentProvider>
+          </AuthProvider>
+        </NetworkProvider>
       </AppErrorBoundary>
     </SafeAreaProvider>
   );
