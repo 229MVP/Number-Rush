@@ -1,0 +1,249 @@
+:root {
+  --bg-0: #05070d;
+  --bg-1: #0a1020;
+  --bg-2: #101a30;
+  --panel: rgba(12, 22, 42, 0.72);
+  --border: rgba(0, 255, 200, 0.18);
+  --border-strong: rgba(0, 255, 200, 0.45);
+  --text: #e8f7ff;
+  --muted: #8aa0b8;
+  --neon: #00ffc8;
+  --neon-dim: #00b38f;
+  --warn: #ffb020;
+  --danger: #ff4d6d;
+  --font-display: "Orbitron", "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(0, 255, 200, 0.12), transparent 55%),
+    radial-gradient(900px 500px at 90% 0%, rgba(40, 120, 255, 0.14), transparent 50%),
+    linear-gradient(180deg, var(--bg-0), var(--bg-1) 40%, var(--bg-2));
+  color: var(--text);
+  font-family: var(--font-body);
+}
+
+a {
+  color: var(--neon);
+  text-decoration: none;
+}
+
+a:hover {
+  color: #fff;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid var(--border);
+  background: rgba(5, 10, 20, 0.85);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.brand {
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--neon);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.brand span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  margin-top: 0.25rem;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.nav a {
+  color: var(--muted);
+  padding: 0.45rem 0.65rem;
+  border-left: 2px solid transparent;
+  font-size: 0.9rem;
+}
+
+.nav a:hover,
+.nav a[aria-current="page"] {
+  color: var(--text);
+  border-left-color: var(--neon);
+  background: rgba(0, 255, 200, 0.06);
+}
+
+.main {
+  padding: 1.75rem 2rem 3rem;
+}
+
+.page-header h1 {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.page-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.badge {
+  display: inline-block;
+  margin-top: 0.85rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  color: var(--neon);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+}
+
+.panel {
+  margin-top: 1.5rem;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: 1.25rem 1.35rem;
+}
+
+.panel h2 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--neon-dim);
+}
+
+.panel p,
+.panel li {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.empty-state {
+  border: 1px dashed var(--border);
+  padding: 1.25rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.auth-card {
+  width: min(420px, 100%);
+  border: 1px solid var(--border);
+  background: var(--panel);
+  padding: 1.75rem;
+}
+
+.auth-card h1 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--neon);
+}
+
+.auth-card p {
+  color: var(--muted);
+  margin: 0 0 1rem;
+  line-height: 1.5;
+}
+
+.auth-card label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.auth-card input {
+  width: 100%;
+  margin-bottom: 0.9rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font: inherit;
+}
+
+.auth-card button {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--border-strong);
+  background: rgba(0, 255, 200, 0.12);
+  color: var(--neon);
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.auth-card button:hover {
+  background: rgba(0, 255, 200, 0.2);
+  color: #fff;
+}
+
+.auth-note {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: var(--warn);
+}
+
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .nav a {
+    border-left: none;
+    border-bottom: 2px solid transparent;
+  }
+
+  .nav a:hover,
+  .nav a[aria-current="page"] {
+    border-left-color: transparent;
+    border-bottom-color: var(--neon);
+  }
+}
