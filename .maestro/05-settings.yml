@@ -9,6 +9,8 @@ appId: number.rush.placeholder
 - assertVisible:
     id: "screen-settings"
 - assertVisible:
+    id: "settings-reduced-motion"
+- assertVisible:
     id: "settings-beta-feedback"
 - assertVisible:
     id: "settings-legal"

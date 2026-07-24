@@ -51,14 +51,16 @@ const appJson = readAppJson();
 const expo = appJson?.expo ?? {};
 
 if (
-  !expo.splash?.image &&
   !expo.plugins?.some?.((p) => {
-    if (typeof p === 'string') return p.includes('splash');
-    return Array.isArray(p) && String(p[0]).includes('splash');
-  })
+    if (Array.isArray(p) && String(p[0]).includes('splash')) return true;
+    if (typeof p === 'string' && p.includes('splash')) return true;
+    return false;
+  }) &&
+  !expo.splash?.image &&
+  !expo.web?.splash?.image
 ) {
   report.warnings.push(
-    'Splash image file may exist, but expo.splash (or splash plugin) is not wired in app.json.',
+    'Splash image file may exist, but expo-splash-screen plugin / splash config is not wired in app.json.',
   );
 }
 

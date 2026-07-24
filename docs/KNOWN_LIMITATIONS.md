@@ -12,12 +12,15 @@
 
 - Persistence is **AsyncStorage only** — clearing app data wipes progress.
 - `android.package` and `ios.bundleIdentifier` are **MISSING** (store blockers).
-- Native splash is **not wired** in Expo config (in-app splash still runs).
+- Native splash is wired via `expo-splash-screen` plugin (asset is temporary/placeholder quality).
 - Audio is **placeholder synthesized WAV** content.
 - Analytics / error reporting have **no remote vendor** wired by default.
 - `__DEV__` helpers can alter local progression / daily state in development builds.
 - Store screenshot set is **not produced** yet.
-- OTA: channels prepared in docs/`eas.json`; **do not publish** until binaries with real IDs exist.
+- EAS CLI not logged in in this environment (`eas project:info` requires `eas login` or `EXPO_TOKEN`)
+- Maestro E2E flows are stubbed; **not executed** against a device/APK yet
+- Ranked RP / division unit tests deferred — see `docs/ranked-tests-deferred.md`
+- `npm audit` reports moderate transitive vulnerabilities (not force-upgraded)
 
 ## Design / assets
 

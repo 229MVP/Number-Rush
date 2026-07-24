@@ -42,15 +42,17 @@ function ToggleRow({
   onToggle,
   accent = ACCENT,
   disabled = false,
+  testID,
 }: {
   label: string;
   value: boolean;
   onToggle: () => void;
   accent?: string;
   disabled?: boolean;
+  testID?: string;
 }) {
   return (
-    <View style={[styles.row, disabled && styles.rowDisabled]}>
+    <View style={[styles.row, disabled && styles.rowDisabled]} testID={testID}>
       <Text style={styles.rowLabel}>{label}</Text>
       <Switch
         value={value}
@@ -304,6 +306,7 @@ export function SettingsScreen({ navigation }: Props) {
             value={settings.reducedMotion}
             onToggle={() => { void handleReducedMotionToggle(); }}
             accent={colors.yellow}
+            testID="settings-reduced-motion"
           />
           <ToggleRow
             label="High Contrast"
@@ -334,6 +337,19 @@ export function SettingsScreen({ navigation }: Props) {
         <SectionHeader label="PREFERENCES" />
         <View style={styles.section}>
           <InfoRow label="Language" value="English" />
+        </View>
+
+        {/* ─── BETA INFO ─── */}
+        <SectionHeader label="BETA INFORMATION" />
+        <View style={styles.section}>
+          <Text style={styles.disclosure}>
+            Number Rush beta stores progress only on this device. There is no
+            account or cloud backup yet — clearing app data removes progress.
+          </Text>
+          <Text style={styles.disclosure}>
+            Daily and Ranked leaderboards are local / Coming Soon previews, not
+            live online competition. Preview reward and balance values may change.
+          </Text>
           <ChevronRow
             label="Legal (DRAFT)"
             onPress={() => {
@@ -372,6 +388,7 @@ export function SettingsScreen({ navigation }: Props) {
             onPress={handleRestoreDefaults}
           />
           <NeonButton
+            testID="settings-reset-all"
             label="RESET ALL LOCAL PROGRESS"
             color={colors.red}
             size="small"
@@ -406,6 +423,7 @@ export function SettingsScreen({ navigation }: Props) {
               {' '}to permanently delete all local progress.
             </Text>
             <TextInput
+              testID="settings-reset-confirm-input"
               style={[
                 styles.resetInput,
                 confirmed && { borderColor: colors.red, color: colors.red },
@@ -463,6 +481,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: withAlpha(ACCENT, 0.18),
     overflow: 'hidden',
+  },
+
+  disclosure: {
+    fontFamily: fontFamilies.rajdhaniSemiBold,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.muted,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
 
   row: {

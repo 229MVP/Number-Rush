@@ -29,6 +29,8 @@
 | `react-native-svg` | Vector icons / shapes | Render-only | No |
 | `expo-linear-gradient` | Visual gradients | Render-only | No |
 | `expo-status-bar` | Status bar style | UI chrome | No |
+| `expo-asset` | Asset loading peer for audio/media | Bundled asset resolution | No |
+| `expo-splash-screen` | Native splash presentation | Splash image config | No |
 | `react-native-safe-area-context` | Insets | Layout metrics | No |
 | `react-native-screens` | Native screen containers | Navigation presentation | No |
 | `lucide-react-native` | Icon components | Render-only | No |

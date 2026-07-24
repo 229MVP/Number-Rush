@@ -13,10 +13,12 @@
 | `ios.bundleIdentifier` | BLOCKED | MISSING — do not invent |
 | Android `versionCode` | BLOCKED | MISSING |
 | iOS `buildNumber` | BLOCKED | MISSING |
-| Splash wired in Expo config | FAIL | `splash-icon.png` exists, not in `app.json` |
+| Splash wired in Expo config | PASS | `splash-icon.png` in `app.json` |
 | Icon / adaptive / favicon present | PASS | |
 | Store screenshots present | FAIL | `assets/store-screenshots/` empty |
 | `design_reference/` preserved | PASS | Do not delete |
+| Error boundary + analytics wired in App | PASS | No-op analytics; BETA badge preview-only |
+| `expo-updates` installed | BLOCKED | Config prepared in docs; package not installed until EAS project linked |
 
 ## Gameplay
 

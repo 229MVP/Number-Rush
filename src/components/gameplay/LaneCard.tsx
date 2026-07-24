@@ -23,6 +23,7 @@ type Props = {
   swapSelected?: boolean;
   reducedMotion?: boolean;
   bombHighlight?: boolean;
+  testID?: string;
 };
 
 export function LaneCard({
@@ -34,6 +35,7 @@ export function LaneCard({
   swapSelected = false,
   reducedMotion = false,
   bombHighlight = false,
+  testID,
 }: Props) {
   const shake = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(1)).current;
@@ -88,6 +90,7 @@ export function LaneCard({
 
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={`Lane ${lane.id}, total ${lane.total}, needs ${need} to reach ${target}`}
       accessibilityState={{ disabled, selected: selected || swapSelected }}

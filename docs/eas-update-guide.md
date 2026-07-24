@@ -8,6 +8,13 @@
 - EAS CLI authenticated locally (`eas login`) — credentials stay on the operator machine, not in repo
 - `eas.json` profiles: `development`, `preview`, `production`, `e2e-test`
 - **Blockers before any real OTA:** `android.package` and `ios.bundleIdentifier` must be set in Expo config (currently **MISSING**)
+- **`expo-updates` is not installed yet.** After `eas init` / project link, install with:
+  `npx expo install expo-updates`
+  Then set `updates.url` to `https://u.expo.dev/<EAS_PROJECT_ID>` and `extra.eas.projectId` in Expo config. Do not invent a project ID.
+
+## Runtime version
+
+`app.json` already sets `runtimeVersion.policy: appVersion` so OTA updates stay aligned with `version` (`1.0.0`). Changing the app version requires a new binary for that runtime line.
 
 ## Channels
 

@@ -1,5 +1,5 @@
-import React from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -22,12 +22,20 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
+import { AnalyticsProvider } from './src/analytics/AnalyticsProvider';
+import { BetaBadge } from './src/components/BetaBadge';
+import { validateEnvironment } from './src/config/validateEnvironment';
+import { AppErrorBoundary } from './src/errors/AppErrorBoundary';
+import { logger } from './src/logging/logger';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { SettingsProvider } from './src/settings/SettingsProvider';
 import { AudioProvider } from './src/audio/AudioProvider';
 import { HapticsProvider } from './src/haptics/HapticsProvider';
 import { GameThemeProvider } from './src/themes/GameThemeProvider';
-import { colors } from './src/theme';
+import { colors, fontFamilies } from './src/theme';
+
+/** Optional init must not block startup forever. */
+const FONT_FALLBACK_MS = 8_000;
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -45,11 +53,34 @@ export default function App() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+  const [fontTimedOut, setFontTimedOut] = useState(false);
+  const navKey = useRef(0);
+  const [boundaryKey, setBoundaryKey] = useState(0);
 
-  if (!fontsLoaded) {
+  useEffect(() => {
+    const result = validateEnvironment();
+    if (!result.ok) {
+      logger.warn('Environment validation issues', {
+        errors: result.errors,
+        warnings: result.warnings,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (fontsLoaded) return;
+    const t = setTimeout(() => {
+      setFontTimedOut(true);
+      logger.warn('Font load timed out; continuing with fallback fonts');
+    }, FONT_FALLBACK_MS);
+    return () => clearTimeout(t);
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded && !fontTimedOut) {
     return (
-      <View style={styles.loading}>
+      <View style={styles.loading} testID="app-loading">
         <StatusBar style="light" />
+        <Text style={styles.loadingBrand}>NUMBER RUSH</Text>
         <ActivityIndicator size="large" color={colors.neonPink} />
       </View>
     );
@@ -57,16 +88,28 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <SettingsProvider>
-        <AudioProvider>
-          <HapticsProvider>
-            <GameThemeProvider>
-              <StatusBar style="light" />
-              <AppNavigator />
-            </GameThemeProvider>
-          </HapticsProvider>
-        </AudioProvider>
-      </SettingsProvider>
+      <AppErrorBoundary
+        key={boundaryKey}
+        onReset={() => setBoundaryKey((k) => k + 1)}
+        onReturnHome={() => {
+          navKey.current += 1;
+          setBoundaryKey((k) => k + 1);
+        }}
+      >
+        <SettingsProvider>
+          <AudioProvider>
+            <HapticsProvider>
+              <GameThemeProvider>
+                <AnalyticsProvider>
+                  <StatusBar style="light" />
+                  <AppNavigator key={navKey.current} />
+                  <BetaBadge />
+                </AnalyticsProvider>
+              </GameThemeProvider>
+            </HapticsProvider>
+          </AudioProvider>
+        </SettingsProvider>
+      </AppErrorBoundary>
     </SafeAreaProvider>
   );
 }
@@ -77,5 +120,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 16,
+  },
+  loadingBrand: {
+    fontFamily: fontFamilies.orbitronBlack,
+    fontSize: 22,
+    letterSpacing: 2,
+    color: colors.neonPink,
   },
 });

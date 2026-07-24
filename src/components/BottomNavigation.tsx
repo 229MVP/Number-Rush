@@ -19,10 +19,10 @@ const ITEMS: Array<{
   Icon: React.ComponentType<{ size?: number; color?: string }>;
   testID: string;
 }> = [
-  { route: 'MainMenu', label: 'HOME', Icon: Home, testID: 'nav-home' },
-  { route: 'Missions', label: 'MISSIONS', Icon: Target, testID: 'nav-missions' },
-  { route: 'Leaderboard', label: 'RANKS', Icon: Trophy, testID: 'nav-ranks' },
-  { route: 'Profile', label: 'PROFILE', Icon: User, testID: 'nav-profile' },
+  { route: 'MainMenu', label: 'HOME', Icon: Home, testID: 'bottom-home' },
+  { route: 'Missions', label: 'MISSIONS', Icon: Target, testID: 'bottom-missions' },
+  { route: 'Leaderboard', label: 'RANKS', Icon: Trophy, testID: 'bottom-ranks' },
+  { route: 'Profile', label: 'PROFILE', Icon: User, testID: 'bottom-profile' },
 ];
 
 export function BottomNavigation({

@@ -66,7 +66,10 @@ export function MainMenuScreen({ navigation }: Props) {
   const accent = themeCtx?.themeColors.neonPink ?? colors.neonPink;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top, backgroundColor: bg }]}>
+    <View
+      style={[styles.root, { paddingTop: insets.top, backgroundColor: bg }]}
+      testID="main-menu"
+    >
       <View
         style={[styles.decorLayer, { pointerEvents: 'none' }]}
         importantForAccessibility="no-hide-descendants"

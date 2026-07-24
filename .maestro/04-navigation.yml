@@ -5,18 +5,18 @@ appId: number.rush.placeholder
 - tapOn:
     id: "splash-start"
 - tapOn:
-    id: "nav-missions"
+    id: "bottom-missions"
 - assertVisible:
     id: "screen-missions"
 - tapOn:
-    id: "nav-ranks"
+    id: "bottom-ranks"
 - assertVisible:
     id: "screen-coming-soon"
 - tapOn:
-    id: "nav-profile"
+    id: "bottom-profile"
 - assertVisible:
     id: "screen-profile"
 - tapOn:
-    id: "nav-home"
+    id: "bottom-home"
 - assertVisible:
     id: "menu-play"

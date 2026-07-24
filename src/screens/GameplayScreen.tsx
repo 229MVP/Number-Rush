@@ -372,6 +372,7 @@ export function GameplayScreen({ navigation, route }: Props) {
       collapsable={false}
       style={[styles.root, { paddingTop: insets.top }]}
       onLayout={onRootLayout}
+      testID="gameplay-screen"
     >
       <View
         style={[styles.decorLayer, { pointerEvents: 'none' }]}
@@ -422,6 +423,7 @@ export function GameplayScreen({ navigation, route }: Props) {
         {game.lanes.map((lane, idx) => (
           <LaneCard
             key={lane.id}
+            testID={`lane-${idx + 1}`}
             lane={lane}
             target={TARGET_VALUE}
             disabled={inputLocked && game.swapMode === 'off' && !game.bombSelected}
@@ -508,6 +510,7 @@ export function GameplayScreen({ navigation, route }: Props) {
 
       <View style={styles.tilesRow}>
         <NumberTile
+          testID="current-tile"
           tile={game.currentTile}
           variant="current"
           multiplierSelected={game.multiplierSelected}
@@ -521,11 +524,12 @@ export function GameplayScreen({ navigation, route }: Props) {
           measureRef={currentTileTargetRef}
           onCardLayout={scheduleMeasure}
         />
-        <NumberTile tile={game.nextTile} variant="next" />
+        <NumberTile testID="next-tile" tile={game.nextTile} variant="next" />
       </View>
 
       <View style={styles.controls}>
         <MultiplierPowerUpButton
+          testID="powerup-multiplier"
           quantity={game.multiplierQuantity}
           selected={game.multiplierSelected}
           disabled={inputLocked || !game.powerUpsEnabled}
@@ -538,6 +542,7 @@ export function GameplayScreen({ navigation, route }: Props) {
         />
         <View style={styles.instructions}>
           <Pressable
+            testID="powerup-drawer"
             accessibilityRole="button"
             accessibilityLabel={`More power-ups, ${game.bombQuantity + game.freezeQuantity + game.shieldQuantity + game.wildQuantity} owned`}
             disabled={!game.powerUpsEnabled || inputLocked}
@@ -559,6 +564,7 @@ export function GameplayScreen({ navigation, route }: Props) {
           </Text>
         </View>
         <SwapPowerUpButton
+          testID="powerup-swap"
           quantity={game.swapQuantity}
           active={game.swapMode !== 'off'}
           disabled={inputLocked || !game.powerUpsEnabled}
