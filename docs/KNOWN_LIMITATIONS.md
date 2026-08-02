@@ -1,31 +1,15 @@
-# Number Rush — Known Limitations (Connected Backend + Monetization Phase)
+# Known Limitations
 
-## Product
+This file has moved. See [`../KNOWN_LIMITATIONS.md`](../KNOWN_LIMITATIONS.md)
+at the project root — it documents the current **sellable-template** posture
+(Classic-only, local-first, no backend/monetization) as of the
+`cursor/sellable-template-dca3` branch.
 
-- **No social friends**, chat, or live head-to-head multiplayer.
-- **Ads / IAP client architecture is present** (AdMob + RevenueCat) but uses **test AdMob IDs**, feature flags, and **MONETIZATION TEST MODE** until production keys, store products, consent messages, and SSV/webhook verification are confirmed. See `docs/monetization-completion-report.md`.
-- **Number Rush Club subscription is disabled** (`subscriptionsEnabled` default false).
-- Local Supabase monetization migrations (`0016`–`0021`) and Edge Functions are **not applied remotely** without explicit confirmation on a Number Rush project.
-- **No cash prizes / gambling / pay-to-win competitive advantages.**
-- **No push notifications.**
-- Practice Daily scores remain **local**.
-- Ranked season reset is **not automated**.
-- Anti-cheat is **basic server replay**, not enterprise fraud detection.
-- Advanced moderation dashboard is not built.
-- Real ads and store purchases **cannot be fully tested in Expo Go** — require an EAS development client.
+Earlier phase-specific known-limitations content (connected backend,
+monetization, live-ops) is preserved for history in:
+- `docs/beta-completion-report.md`
+- `docs/monetization-completion-report.md`
+- `docs/liveops-completion-report.md`
 
-## Backend / accounts
-
-- Cloud features require a **dedicated Number Rush Supabase project** (not applied remotely in this PR).
-- Until URL + anon key are configured, the app stays in **local/guest** mode.
-- Account recovery depends on **email access** (magic link).
-- SQL/RLS integration tests and Edge Function deploys are **not yet executed** against a live Number Rush project (including monetization SQL/Edge — see `docs/monetization-test-plan.md`).
-- Ranked match results still finish through local reward paths; **server validate-run** must be deployed for trusted RP.
-
-## Store / ops
-
-- `android.package` and `ios.bundleIdentifier` remain **MISSING**.
-- Placeholder audio / splash art quality.
-- Maestro E2E not run on device.
-- Privacy / Terms remain **DRAFT** until hosted URLs exist.
-- AdMob SSV ECDSA verification and RevenueCat sandbox fulfillment **not proven** in this environment.
+Those describe features that exist in source but are **disabled** for this
+template SKU — see `src/config/templateFeatures.ts`.

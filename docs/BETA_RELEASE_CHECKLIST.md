@@ -1,5 +1,13 @@
 # Number Rush — Beta Release Checklist
 
+> **Superseded posture note (2026-08-02):** This project is now packaged as
+> the **sellable "Number Rush — Neon Number Puzzle Game Template"**
+> (Classic-only, local-first, no backend/monetization). A live public beta
+> is not the current goal — see `docs/SELLABLE_TEMPLATE_AUDIT.md` and the
+> root `KNOWN_LIMITATIONS.md`. This checklist is retained for history and
+> becomes relevant again only if a buyer takes this template toward their
+> own store launch.
+
 **Honest statuses only:** `PASS` · `FAIL` · `BLOCKED` · `NOT TESTED` · `NOT APPLICABLE`  
 **Date:** 2026-07-24 · Expo SDK 57 · Local-only app
 

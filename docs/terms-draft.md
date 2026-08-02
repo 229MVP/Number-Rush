@@ -1,5 +1,9 @@
 # Terms of Use — Number Rush (DRAFT)
 
+> **Note:** Describes the full connected-backend product. The sellable
+> **template** SKU has no accounts, purchases, or online services. Retained
+> as reference for buyers who re-enable backend features.
+
 **Status:** DRAFT — not legal advice. Finalize with counsel before public store release.  
 **Last updated:** 2026-07-24
 

@@ -1,5 +1,10 @@
 # Privacy Policy — Number Rush (DRAFT)
 
+> **Note:** Describes the full connected-backend product. The sellable
+> **template** SKU collects no data at all — it has no accounts, no network
+> calls, and no analytics wired to a vendor. This draft is retained as
+> reference for buyers who re-enable backend features per `CUSTOMIZATION_GUIDE.md`.
+
 **Status:** DRAFT — not legal advice. Replace with counsel-reviewed text and a hosted URL before production store release.  
 **Last updated:** 2026-07-24  
 **Applies to:** Number Rush mobile / Expo client with optional Supabase-connected features.

@@ -1,5 +1,9 @@
 # Apple App Store / TestFlight — Beta Checklist
 
+> **Superseded posture note:** Current deliverable is a source-code template
+> (Classic-only, no backend). This checklist applies only if/when a buyer
+> takes the template toward their own store submission.
+
 ## Blockers
 
 | Item | Status |
