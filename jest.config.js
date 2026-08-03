@@ -21,7 +21,9 @@ module.exports = {
     '<rootDir>/design_reference/',
     '<rootDir>/ui/',
     '<rootDir>/dist/',
+    '<rootDir>/release/',
   ],
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/release/'],
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@shopify/react-native-skia|native-base|react-native-svg|lucide-react-native)',
   ],

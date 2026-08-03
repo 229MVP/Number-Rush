@@ -1,5 +1,10 @@
 # Number Rush — Data Inventory
 
+> **Note:** Describes the full connected-backend product. The sellable
+> **template** SKU collects nothing — no accounts, no network calls, no
+> analytics vendor wired in. AsyncStorage holds only best score, tutorial
+> completion, and local stats, all on-device.
+
 **Modes:** Guest (local) and optional Authenticated (Supabase).  
 **Persistence:** AsyncStorage + SecureStore (session) on device; Supabase Postgres when configured.
 
