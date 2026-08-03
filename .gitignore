@@ -44,6 +44,7 @@ yarn-error.*
 /android
 .env
 
+# Supabase CLI local cache
 supabase/.temp/
 admin/node_modules/
 admin/.next/

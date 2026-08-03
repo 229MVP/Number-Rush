@@ -1,26 +1,20 @@
-import React, { useCallback, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useCallback } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Play, Settings, ShoppingBag, Star, Trophy } from 'lucide-react-native';
+import { HelpCircle, Play, Settings, TrendingUp } from 'lucide-react-native';
 import { AnimatedNeonBackground } from '../components/AnimatedNeonBackground';
-import { BottomNavigation } from '../components/BottomNavigation';
-import { CurrencyChip } from '../components/CurrencyChip';
 import { GridBackground } from '../components/GridBackground';
 import { NeonButton } from '../components/NeonButton';
 import { NeonIconButton } from '../components/NeonIconButton';
 import { NumberRushLogo } from '../components/NumberRushLogo';
 import { PerspectiveGrid } from '../components/PerspectiveGrid';
-import { getUtcDateKey } from '../game/dailyTournament';
-import type { BottomNavRoute, RootStackParamList } from '../navigation/navigationTypes';
-import { hasCompletedOfficialDailyAttempt } from '../storage/dailyStorage';
-import { countClaimableMissions } from '../storage/missionStorage';
-import { getPlayerProfile } from '../storage/playerStorage';
+import type { RootStackParamList } from '../navigation/navigationTypes';
 import { useOptionalAudio } from '../audio/AudioProvider';
 import { useReducedMotionPreference } from '../settings/SettingsProvider';
 import { useOptionalGameTheme } from '../themes/GameThemeProvider';
-import { colors, fontFamilies, spacing, withAlpha } from '../theme';
+import { colors, spacing, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MainMenu'>;
 
@@ -29,38 +23,12 @@ export function MainMenuScreen({ navigation }: Props) {
   const themeCtx = useOptionalGameTheme();
   const audio = useOptionalAudio();
   const reducedMotion = useReducedMotionPreference();
-  const refreshThemes = themeCtx?.refreshThemes;
-  const [dailyBadge, setDailyBadge] = useState<'NEW' | 'DONE' | null>(null);
-  const [coins, setCoins] = useState(500);
-  const [gems, setGems] = useState(25);
-  const [level, setLevel] = useState(1);
-  const [claimable, setClaimable] = useState(0);
-
-  const refresh = useCallback(async () => {
-    const [done, profile, claimCount] = await Promise.all([
-      hasCompletedOfficialDailyAttempt(getUtcDateKey()),
-      getPlayerProfile(),
-      countClaimableMissions(),
-    ]);
-    setDailyBadge(done ? 'DONE' : 'NEW');
-    setCoins(profile.coins);
-    setGems(profile.gems);
-    setLevel(profile.level);
-    setClaimable(claimCount);
-    await refreshThemes?.();
-  }, [refreshThemes]);
 
   useFocusEffect(
     useCallback(() => {
-      void refresh();
       void audio?.playMusic('menu');
-    }, [refresh, audio]),
+    }, [audio]),
   );
-
-  const onBottomNav = (route: BottomNavRoute) => {
-    if (route === 'MainMenu') return;
-    navigation.navigate(route);
-  };
 
   const bg = themeCtx?.themeColors.background ?? colors.background;
   const accent = themeCtx?.themeColors.neonPink ?? colors.neonPink;
@@ -87,15 +55,7 @@ export function MainMenuScreen({ navigation }: Props) {
       </View>
 
       <View style={[styles.topRow, { pointerEvents: 'box-none' }]}>
-        <View style={styles.topLeft}>
-          <CurrencyChip coins={coins} gems={gems} />
-          <View
-            pointerEvents="none"
-            style={[styles.levelChip, { borderColor: withAlpha(accent, 0.45) }]}
-          >
-            <Text style={[styles.levelText, { color: accent }]}>LV {level}</Text>
-          </View>
-        </View>
+        <View style={styles.topSpacer} />
         <NeonIconButton
           testID="menu-settings"
           accessibilityLabel="Settings"
@@ -122,42 +82,21 @@ export function MainMenuScreen({ navigation }: Props) {
               navigation.navigate('Gameplay', { mode: 'classic' })
             }
           />
-          <View style={styles.buttonWrap}>
-            <NeonButton
-              testID="menu-daily"
-              label="DAILY TOURNAMENT"
-              color={colors.orange}
-              size="large"
-              icon={<Star size={17} color={colors.white} />}
-              onPress={() => navigation.navigate('Tournament')}
-            />
-            {dailyBadge ? (
-              <View
-                pointerEvents="none"
-                style={[
-                  styles.badge,
-                  dailyBadge === 'DONE' ? styles.badgeDone : styles.badgeNew,
-                ]}
-              >
-                <Text style={styles.badgeText}>{dailyBadge}</Text>
-              </View>
-            ) : null}
-          </View>
           <NeonButton
-            testID="menu-ranked"
-            label="RANKED"
-            color={colors.electricBlue}
+            testID="menu-how-to-play"
+            label="HOW TO PLAY"
+            color={colors.cyan}
             size="large"
-            icon={<Trophy size={17} color={colors.white} />}
-            onPress={() => navigation.navigate('Ranked')}
+            icon={<HelpCircle size={17} color={colors.white} />}
+            onPress={() => navigation.navigate('HowToPlay')}
           />
           <NeonButton
-            testID="menu-shop"
-            label="SHOP"
-            color={colors.purple}
+            testID="menu-stats"
+            label="STATS"
+            color={colors.green}
             size="large"
-            icon={<ShoppingBag size={17} color={colors.white} />}
-            onPress={() => navigation.navigate('Shop')}
+            icon={<TrendingUp size={17} color={colors.white} />}
+            onPress={() => navigation.navigate('Stats')}
           />
           <NeonButton
             testID="menu-events"
@@ -175,12 +114,6 @@ export function MainMenuScreen({ navigation }: Props) {
           />
         </View>
       </View>
-
-      <BottomNavigation
-        activeRoute="MainMenu"
-        onNavigate={onBottomNav}
-        missionsBadgeCount={claimable}
-      />
     </View>
   );
 }
@@ -206,27 +139,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     zIndex: 10,
   },
-  topLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  levelChip: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: colors.card,
-  },
-  levelText: {
-    fontFamily: fontFamilies.orbitronBold,
-    fontSize: 10,
-    letterSpacing: 0.5,
-  },
+  topSpacer: { flex: 1 },
   content: {
     flex: 1,
     paddingHorizontal: spacing.screenPadding,
     paddingBottom: 10,
+    justifyContent: 'center',
     zIndex: 10,
   },
   menuGlow: {
@@ -245,32 +163,5 @@ const styles = StyleSheet.create({
   buttons: {
     width: '100%',
     gap: spacing.menuButtonGap,
-  },
-  buttonWrap: {
-    position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: -6,
-    right: 10,
-    zIndex: 5,
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderWidth: 1,
-  },
-  badgeNew: {
-    backgroundColor: withAlpha(colors.green, 0.25),
-    borderColor: colors.green,
-  },
-  badgeDone: {
-    backgroundColor: withAlpha(colors.electricBlue, 0.25),
-    borderColor: colors.electricBlue,
-  },
-  badgeText: {
-    fontFamily: fontFamilies.rajdhaniBold,
-    fontSize: 9,
-    color: colors.white,
-    letterSpacing: 0.8,
   },
 });

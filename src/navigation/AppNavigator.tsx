@@ -29,6 +29,8 @@ import { EventDetailScreen } from '../screens/EventDetailScreen';
 import { NewsScreen } from '../screens/NewsScreen';
 import { MaintenanceScreen } from '../screens/MaintenanceScreen';
 import { UpdateRequiredScreen } from '../screens/UpdateRequiredScreen';
+import { HowToPlayScreen } from '../screens/HowToPlayScreen';
+import { StatsScreen } from '../screens/StatsScreen';
 import { colors } from '../theme';
 import type { RootStackParamList } from './navigationTypes';
 
@@ -93,6 +95,8 @@ export function AppNavigator() {
         <Stack.Screen name="News" component={NewsScreen} />
         <Stack.Screen name="Maintenance" component={MaintenanceScreen} />
         <Stack.Screen name="UpdateRequired" component={UpdateRequiredScreen} />
+        <Stack.Screen name="HowToPlay" component={HowToPlayScreen} />
+        <Stack.Screen name="Stats" component={StatsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

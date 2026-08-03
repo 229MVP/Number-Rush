@@ -47,6 +47,8 @@ export type RootStackParamList = {
   Maintenance: undefined;
   UpdateRequired: undefined;
   PlayerReport: undefined;
+  HowToPlay: undefined;
+  Stats: undefined;
 };
 
 export type BottomNavRoute = 'MainMenu' | 'Missions' | 'Leaderboard' | 'Profile';
