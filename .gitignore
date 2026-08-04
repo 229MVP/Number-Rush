@@ -46,5 +46,4 @@ yarn-error.*
 
 # Supabase CLI local cache
 supabase/.temp/
-admin/node_modules/
-admin/.next/
+
