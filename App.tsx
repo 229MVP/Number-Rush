@@ -39,6 +39,8 @@ import { HapticsProvider } from './src/haptics/HapticsProvider';
 import { GameThemeProvider } from './src/themes/GameThemeProvider';
 import { CloudSyncProvider } from './src/sync/CloudSyncProvider';
 import { SubmissionProvider } from './src/submissions/SubmissionProvider';
+import { RemoteConfigProvider } from './src/liveops/RemoteConfigProvider';
+import { LiveOpsGate } from './src/liveops/LiveOpsGate';
 import { colors, fontFamilies } from './src/theme';
 
 /** Optional init must not block startup forever. */
@@ -106,27 +108,31 @@ export default function App() {
         <NetworkProvider>
           <AuthProvider>
             <ConsentProvider>
-              <AdsProvider>
-                <PurchasesProvider>
-                  <SettingsProvider>
-                    <AudioProvider>
-                      <HapticsProvider>
-                        <GameThemeProvider>
-                          <CloudSyncProvider>
-                            <SubmissionProvider>
-                              <AnalyticsProvider>
-                                <StatusBar style="light" />
-                                <AppNavigator key={navKey.current} />
-                                <BetaBadge />
-                              </AnalyticsProvider>
-                            </SubmissionProvider>
-                          </CloudSyncProvider>
-                        </GameThemeProvider>
-                      </HapticsProvider>
-                    </AudioProvider>
-                  </SettingsProvider>
-                </PurchasesProvider>
-              </AdsProvider>
+              <RemoteConfigProvider>
+                <AdsProvider>
+                  <PurchasesProvider>
+                    <SettingsProvider>
+                      <AudioProvider>
+                        <HapticsProvider>
+                          <GameThemeProvider>
+                            <CloudSyncProvider>
+                              <SubmissionProvider>
+                                <AnalyticsProvider>
+                                  <StatusBar style="light" />
+                                  <LiveOpsGate>
+                                    <AppNavigator key={navKey.current} />
+                                  </LiveOpsGate>
+                                  <BetaBadge />
+                                </AnalyticsProvider>
+                              </SubmissionProvider>
+                            </CloudSyncProvider>
+                          </GameThemeProvider>
+                        </HapticsProvider>
+                      </AudioProvider>
+                    </SettingsProvider>
+                  </PurchasesProvider>
+                </AdsProvider>
+              </RemoteConfigProvider>
             </ConsentProvider>
           </AuthProvider>
         </NetworkProvider>
