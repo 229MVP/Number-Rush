@@ -98,6 +98,20 @@ export function MainMenuScreen({ navigation }: Props) {
             icon={<TrendingUp size={17} color={colors.white} />}
             onPress={() => navigation.navigate('Stats')}
           />
+          <NeonButton
+            testID="menu-events"
+            label="EVENTS"
+            color={colors.cyan}
+            size="large"
+            onPress={() => navigation.navigate('Events')}
+          />
+          <NeonButton
+            testID="menu-news"
+            label="NEWS"
+            color={colors.orange}
+            size="large"
+            onPress={() => navigation.navigate('News')}
+          />
         </View>
       </View>
     </View>

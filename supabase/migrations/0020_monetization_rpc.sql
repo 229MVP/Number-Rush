@@ -53,7 +53,7 @@ BEGIN
       multiplier = multiplier + COALESCE((v_inv ->> 'multiplier')::integer, 0),
       swap = swap + COALESCE((v_inv ->> 'swap')::integer, 0),
       bomb = bomb + COALESCE((v_inv ->> 'bomb')::integer, 0),
-      freeze = freeze + COALESCE((v_inv ->> 'freeze')::integer, 0),
+      "freeze" = "freeze" + COALESCE((v_inv ->> 'freeze')::integer, 0),
       shield = shield + COALESCE((v_inv ->> 'shield')::integer, 0),
       wild = wild + COALESCE((v_inv ->> 'wild')::integer, 0)
     WHERE user_id = p_user_id;
@@ -596,7 +596,7 @@ BEGIN
         WHEN 'multiplier' THEN (SELECT multiplier FROM public.player_inventory WHERE user_id = v_orig.user_id)
         WHEN 'swap' THEN (SELECT swap FROM public.player_inventory WHERE user_id = v_orig.user_id)
         WHEN 'bomb' THEN (SELECT bomb FROM public.player_inventory WHERE user_id = v_orig.user_id)
-        WHEN 'freeze' THEN (SELECT freeze FROM public.player_inventory WHERE user_id = v_orig.user_id)
+        WHEN 'freeze' THEN (SELECT "freeze" FROM public.player_inventory WHERE user_id = v_orig.user_id)
         WHEN 'shield' THEN (SELECT shield FROM public.player_inventory WHERE user_id = v_orig.user_id)
         WHEN 'wild' THEN (SELECT wild FROM public.player_inventory WHERE user_id = v_orig.user_id)
         ELSE 0

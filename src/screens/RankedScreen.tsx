@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -22,8 +22,10 @@ import {
 import { issueRankedRunTicket } from '../backend/rankedTicketService';
 import { liveRankedEnabled } from '../config/featureFlags';
 import { useAuth } from '../hooks/useAuth';
+import { useCurrentSeason } from '../hooks/useCurrentSeason';
 import type { GameMode } from '../game/gameTypes';
 import type { RootStackParamList } from '../navigation/navigationTypes';
+import { trackEvent } from '../analytics/analyticsService';
 import { colors, fontFamilies, neonGlow, radii, withAlpha } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Ranked'>;
@@ -46,10 +48,15 @@ function modeBanner(mode: RankedLeaderboardResult['mode']): string {
 export function RankedScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useAuth();
+  const { season } = useCurrentSeason();
   const [loading, setLoading] = useState(true);
   const [board, setBoard] = useState<RankedLeaderboardResult | null>(null);
   const [playBusy, setPlayBusy] = useState(false);
   const [playNote, setPlayNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (season) trackEvent('season_viewed', { seasonKey: season.seasonKey });
+  }, [season]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -122,9 +129,15 @@ export function RankedScreen({ navigation }: Props) {
         <View style={[styles.hero, neonGlow(ACCENT, 6)]}>
           <Swords size={40} color={ACCENT} />
           <Text style={styles.heroTitle}>SEASON RANKED</Text>
-          <Text style={styles.heroDesc}>
-            Climb divisions with verified ranked runs.
-          </Text>
+          {season ? (
+            <Text style={styles.heroDesc}>
+              {season.name} · ends {season.endsAt.slice(0, 10)} · {season.status}
+            </Text>
+          ) : (
+            <Text style={styles.heroDesc}>
+              Climb divisions with verified ranked runs.
+            </Text>
+          )}
         </View>
 
         {showLive ? (

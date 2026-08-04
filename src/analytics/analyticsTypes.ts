@@ -50,7 +50,23 @@ export type AnalyticsEventName =
   | 'purchase_failed'
   | 'purchase_restored'
   | 'purchase_restore_failed'
-  | 'entitlements_updated';
+  | 'entitlements_updated'
+  | 'remote_config_fetched'
+  | 'remote_config_failed'
+  | 'maintenance_screen_viewed'
+  | 'update_required_viewed'
+  | 'season_viewed'
+  | 'season_reward_claimed'
+  | 'event_viewed'
+  | 'event_joined'
+  | 'event_completed'
+  | 'event_reward_claimed'
+  | 'announcement_viewed'
+  | 'announcement_action_tapped'
+  | 'report_submitted'
+  | 'sync_queue_depth'
+  | 'run_validation_rejected'
+  | 'purchase_fulfillment_delayed';
 
 export type AnalyticsPayload = Record<string, string | number | boolean | null>;
 

@@ -24,6 +24,11 @@ import { CloudSyncScreen } from '../screens/auth/CloudSyncScreen';
 import { AuthCallbackScreen } from '../screens/auth/AuthCallbackScreen';
 import { ReportAdScreen } from '../screens/ReportAdScreen';
 import { SyncConflictScreen } from '../screens/SyncConflictScreen';
+import { EventsScreen } from '../screens/EventsScreen';
+import { EventDetailScreen } from '../screens/EventDetailScreen';
+import { NewsScreen } from '../screens/NewsScreen';
+import { MaintenanceScreen } from '../screens/MaintenanceScreen';
+import { UpdateRequiredScreen } from '../screens/UpdateRequiredScreen';
 import { HowToPlayScreen } from '../screens/HowToPlayScreen';
 import { StatsScreen } from '../screens/StatsScreen';
 import { colors } from '../theme';
@@ -85,6 +90,11 @@ export function AppNavigator() {
         <Stack.Screen name="CloudSync" component={CloudSyncScreen} />
         <Stack.Screen name="SyncConflict" component={SyncConflictScreen} />
         <Stack.Screen name="AuthCallback" component={AuthCallbackScreen} />
+        <Stack.Screen name="Events" component={EventsScreen} />
+        <Stack.Screen name="EventDetail" component={EventDetailScreen} />
+        <Stack.Screen name="News" component={NewsScreen} />
+        <Stack.Screen name="Maintenance" component={MaintenanceScreen} />
+        <Stack.Screen name="UpdateRequired" component={UpdateRequiredScreen} />
         <Stack.Screen name="HowToPlay" component={HowToPlayScreen} />
         <Stack.Screen name="Stats" component={StatsScreen} />
       </Stack.Navigator>
